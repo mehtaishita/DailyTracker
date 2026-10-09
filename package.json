@@ -8,7 +8,8 @@
     "dev:electron": "NODE_ENV=development electron .",
     "dev": "concurrently -k -n VITE,ELECTRON -c cyan,magenta \"npm run dev:renderer\" \"sleep 2 && npm run dev:electron\"",
     "build": "vite build",
-    "start": "npm run build && electron ."
+    "start": "npm run build && electron .",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
