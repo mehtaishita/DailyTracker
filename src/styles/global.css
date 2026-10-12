@@ -32,48 +32,6 @@
   --radius:       12px;
 }
 
-/* ── Ocean theme (dark navy + cyan + amber) ───────────────────────────────── */
-[data-theme="ocean"] {
-  --bg:           #0D1B2A;
-  --surface:      #122233;
-  --surface-2:    #1A2E44;
-  --surface-3:    #213651;
-  --frame-bg:     #091525;
-  --teal:         #29ACEA;
-  --teal-dim:     rgba(41,172,234,0.15);
-  --teal-glow:    rgba(41,172,234,0.35);
-  --pink:         #F5A623;
-  --pink-dim:     rgba(245,166,35,0.15);
-  --pink-glow:    rgba(245,166,35,0.35);
-  --lavender:     #5E9ED6;
-  --lavender-dim: rgba(94,158,214,0.15);
-  --text:         #E4EEF8;
-  --text-dim:     #7FA3CA;
-  --text-faint:   #7aaac0;
-  --border:       rgba(41,172,234,0.14);
-}
-
-/* ── Terminal theme (black + multi-green) ────────────────────────────────── */
-[data-theme="terminal"] {
-  --bg:           #0d0d0d;
-  --surface:      #161616;
-  --surface-2:    #222222;
-  --surface-3:    #303030;
-  --frame-bg:     #060606;
-  --teal:         #39ff14;        /* neon lime — primary accent */
-  --teal-dim:     rgba(57,255,20,0.12);
-  --teal-glow:    rgba(57,255,20,0.30);
-  --pink:         #00ffaa;        /* aqua-green — secondary accent */
-  --pink-dim:     rgba(0,255,170,0.10);
-  --pink-glow:    rgba(0,255,170,0.25);
-  --lavender:     #aaff44;        /* chartreuse — tertiary accent */
-  --lavender-dim: rgba(170,255,68,0.12);
-  --text:         #d4ffd0;
-  --text-dim:     #77ee66;
-  --text-faint:   #55bb44;
-  --border:       rgba(57,255,20,0.18);
-}
-
 /* ── Coastal theme (dark navy ocean + sky-blue accents) ──────────────────── */
 [data-theme="coastal"] {
   --bg:           #051e30;   /* deep ocean floor */
@@ -97,6 +55,106 @@
 
 /* Buttons keep the original dark navy bg so the swap doesn't affect them */
 [data-theme="coastal"] .settings-save-btn { background: #005a8e; color: #e8f4fd; }
+
+/* ── Pan themes: shared flag-gradient frame (data-theme="pan-…") ─────────── */
+/* One continuous background so the header, sidebar and the gaps around the
+   content panel always match. The upper-right half runs pink → yellow → cyan left
+   to right (under the header); the lower-left half runs it top to bottom (under the
+   sidebar). On the diagonal both are the same colour, so they meet seamlessly. */
+[data-theme^="pan"] body {
+  background: linear-gradient(90deg, #FF218C 0%, #FFD800 50%, #21B1FF 100%);
+}
+[data-theme^="pan"] body::before {
+  content:        '';
+  position:       fixed;
+  inset:          0;
+  z-index:        -1;
+  pointer-events: none;
+  background:     linear-gradient(180deg, #FF218C 0%, #FFD800 50%, #21B1FF 100%);
+  clip-path:      polygon(0 0, 100% 100%, 0 100%);
+}
+
+/* Header + sidebar sit directly on the gradient: dark text, frosted active tab */
+[data-theme^="pan"] .app-title {
+  background: none;
+  -webkit-text-fill-color: #0b4a52;   /* dark teal, matches the active-tab bar */
+  color: #0b4a52;
+}
+[data-theme^="pan"] .app-date               { color: #063a42; opacity: 1; }   /* deeper dark teal: readable on the cyan end */
+[data-theme^="pan"] .app-tab.nav-link       { color: #1f1424; }
+[data-theme^="pan"] .app-tab.nav-link:hover { color: #1f1424; background: rgba(255,255,255,0.30); }
+[data-theme^="pan"] .app-tab.nav-link.active { color: #1f1424; background: rgba(255,255,255,0.60); }
+[data-theme^="pan"] .app-tab.nav-link.active::before { background: #0b4a52; }   /* dark teal, echoes the Glass panel */
+[data-theme^="pan"] .tab-icon               { opacity: 0.8; }
+
+[data-theme^="pan"] .view-card {
+  box-shadow: 0 6px 24px rgba(0,0,0,0.30);
+}
+[data-theme^="pan"] .view-card::before {
+  height:     4px;
+  background: linear-gradient(90deg, #FF218C, #FFD800, #21B1FF);
+}
+
+/* ── Pan · Yellow (light tinted cards on the flag gradient frame) ────────── */
+/* Accents are deep shades of the flag colours so they stay readable on light cards. */
+[data-theme="pan-yellow"] {
+  --bg:           #fff6cc;
+  --surface:      #fffbe6;
+  --surface-2:    #fff4c2;
+  --surface-3:    #ffeca0;
+  --frame-bg:     #FFD800;
+  --teal:         #005e8c;   /* deep flag cyan */
+  --teal-dim:     rgba(33,177,255,0.14);
+  --teal-glow:    rgba(33,177,255,0.40);
+  --pink:         #b0005b;   /* deep flag magenta */
+  --pink-dim:     rgba(255,33,140,0.11);
+  --pink-glow:    rgba(255,33,140,0.35);
+  --lavender:     #7a3f00;   /* warm brown — yellow text would vanish on yellow */
+  --lavender-dim: rgba(122,63,0,0.12);
+  --text:         #2a2205;
+  --text-dim:     #54461a;
+  --text-faint:   #665829;
+  --border:       rgba(42,34,5,0.15);
+}
+
+/* Light-card fixes: colours tuned for dark themes are too pale here */
+[data-theme="pan-yellow"] .view-card         { box-shadow: 0 6px 24px rgba(13,34,48,0.18); }
+[data-theme="pan-yellow"] .settings-save-btn { color: #ffffff; }
+[data-theme="pan-yellow"] :is(.pr-stat-add, .settings-ics-status.connected) { color: #136c34; }
+[data-theme="pan-yellow"] .pr-stat-del { color: #c81e3a; }
+[data-theme="pan-yellow"] :is(.group-sentry, .sentry-trend-ongoing, .sentry-triage-med) { color: #a34a00; }
+[data-theme="pan-yellow"] :is(.alert-time, .alert-btn-dismiss, .rv-medium) { color: #6e5300; }
+
+/* ── Pan · Glass (frosted translucent panel over the flag gradient) ──────── */
+/* 84% opacity keeps text readable even over the bright yellow band; accents are
+   lighter tints of the flag colours for the same reason. */
+[data-theme="pan-glass"] {
+  --bg:           rgba(8,25,28,0.84);
+  --surface:      rgba(8,25,28,0.84);
+  --surface-2:    rgba(255,255,255,0.06);
+  --surface-3:    rgba(255,255,255,0.10);
+  --frame-bg:     #FFD800;
+  --teal:         #8ad6ff;   /* light flag cyan */
+  --teal-dim:     rgba(33,177,255,0.18);
+  --teal-glow:    rgba(33,177,255,0.40);
+  --pink:         #ff9ccc;   /* light flag magenta */
+  --pink-dim:     rgba(255,33,140,0.18);
+  --pink-glow:    rgba(255,33,140,0.40);
+  --lavender:     #FFD800;   /* flag yellow */
+  --lavender-dim: rgba(255,216,0,0.14);
+  --text:         #f0fbfc;
+  --text-dim:     #cfe6e9;
+  --text-faint:   #a9c9ce;
+  --border:       rgba(255,255,255,0.14);
+}
+
+[data-theme="pan-glass"] .view-card {
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter:         blur(22px) saturate(140%);
+  border:                  1px solid rgba(255,255,255,0.18);
+}
+/* Floating alert sits over content, so it stays solid */
+[data-theme="pan-glass"] .meeting-alert { background: #0b2024; }
 
 /* ── Reset ────────────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; margin: 0; padding: 0; }

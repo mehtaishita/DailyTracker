@@ -119,7 +119,7 @@ export interface IssueDetail {
 
 export type AlertMode = 'alarm' | 'flash' | 'none'
 export type TabId    = 'today' | 'tasks' | 'calendar' | 'jira' | 'github' | 'sentry' | 'notes' | 'settings'
-export type ThemeId  = 'default' | 'ocean' | 'terminal' | 'coastal'
+export type ThemeId  = 'default' | 'coastal' | 'pan-yellow' | 'pan-glass'
 
 export interface ReviewIssue {
   id:          string

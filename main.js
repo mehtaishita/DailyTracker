@@ -247,7 +247,6 @@ function generateDockIcon(outPath) {
     pngChunk('IDAT', zlib.deflateSync(rows, { level: 6 })),
     pngChunk('IEND', Buffer.alloc(0)),
   ]))
-  console.log('[icon] generated', outPath)
 }
 
 function scheduleDailyRefresh() {
@@ -718,7 +717,6 @@ ipcMain.handle('fetch-jira-sprint', async () => {
 
   // Scoped tokens need the API gateway — get cloudId from the instance (no auth required)
   const tenant  = await makeHttpsGet(`https://${domain}/_edge/tenant_info`)
-  console.log('[jira] tenant:', JSON.stringify(tenant))
 
   if (!tenant?.cloudId) return { issues: [], error: 'Could not resolve cloud ID from ' + domain }
 
@@ -727,7 +725,6 @@ ipcMain.handle('fetch-jira-sprint', async () => {
   const url     = `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/search/jql?jql=${jql}&fields=summary,status&maxResults=100`
 
   const data = await makeHttpsGet(url, headers)
-  console.log('[jira] response:', JSON.stringify(data)?.slice(0, 500))
 
   if (!data)        return { issues: [], error: 'fetch_failed' }
   if (!data.issues) return { issues: [], error: data.errorMessages?.[0] || JSON.stringify(data)?.slice(0, 200) }
@@ -987,8 +984,6 @@ ipcMain.handle('fetch-github', async () => {
     ...repoList.map(repo => ghCommand('repo-prs', { repo })),
   ])
 
-  console.log('[github] my-prs:', JSON.stringify(myRes)?.slice(0, 300))
-  console.log('[github] review-requested:', JSON.stringify(reviewReqRes)?.slice(0, 300))
 
   if (myRes.error && reviewReqRes.error && repoResults.every(r => r.error))
     return { myPRs: [], reviews: [], openPRs: [], error: myRes.error }
@@ -1166,12 +1161,8 @@ ipcMain.handle('fetch-review-prs', async () => {
     return { myPRs: [], otherPRs: [], error: err }
   }
 
-  const statusNames = [...new Set(searchData.issues.map(i => i.fields.status.name))]
-  console.log(`[review] ${searchData.issues.length} sprint issues, statuses:`, statusNames)
-
+  const statusNames  = [...new Set(searchData.issues.map(i => i.fields.status.name))]
   const reviewIssues = searchData.issues.filter(i => /review/i.test(i.fields.status.name))
-  console.log(`[review] ${reviewIssues.length} issues match review status:`,
-    reviewIssues.map(i => `${i.key} (${i.fields.status.name})`))
 
   if (reviewIssues.length === 0) {
     return { myPRs: [], otherPRs: [], error: `No tickets in Code Review. Statuses found: ${statusNames.join(', ')}` }
@@ -1192,7 +1183,6 @@ ipcMain.handle('fetch-review-prs', async () => {
   const myPrUrls = new Set((myPrsRes.data || []).map(p => p.url))
 
   const allGhPRs = repoResults.flatMap(r => r.data || [])
-  console.log(`[review] ${allGhPRs.length} open PRs from GitHub`)
 
   const keyPattern = new RegExp(`${projectKey}-\\d+`, 'i')
   const prByKey = {}
@@ -1200,7 +1190,6 @@ ipcMain.handle('fetch-review-prs', async () => {
     const m = pr.title?.match(keyPattern)
     if (m) prByKey[m[0].toUpperCase()] = pr
   }
-  console.log('[review] PRs matched to project keys:', Object.keys(prByKey))
 
   const all = reviewIssues.flatMap(issue => {
     const pr = prByKey[issue.key]
@@ -1208,7 +1197,6 @@ ipcMain.handle('fetch-review-prs', async () => {
     const urlM = pr.url?.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/)
     const repo     = urlM ? urlM[1] : (pr.repository?.nameWithOwner || pr.repository?.name || 'unknown')
     const prNumber = urlM ? parseInt(urlM[2]) : pr.number
-    console.log(`[review] mapped ${issue.key}: repo=${repo} number=${prNumber} url=${pr.url}`)
     return [{
       jiraKey:     issue.key,
       jiraUrl:     `https://${domain}/browse/${issue.key}`,
@@ -1221,7 +1209,6 @@ ipcMain.handle('fetch-review-prs', async () => {
     }]
   })
 
-  console.log(`[review] total: ${all.length} matched PR(s)`, all.map(p => `${p.jiraKey} → ${p.prUrl}`))
 
   if (all.length === 0) {
     return {
@@ -1249,14 +1236,12 @@ ipcMain.handle('fetch-review-prs', async () => {
 })
 
 ipcMain.handle('post-pr-review-comment', async (_e, number, repo, body) => {
-  console.log('[post-pr-review-comment] number:', number, '| repo:', repo)
   if (!number || !repo || !body?.trim()) {
     console.error('[post-pr-review-comment] missing params — number:', number, 'repo:', repo, 'body length:', body?.length)
     return { error: 'missing params' }
   }
   const res = await ghCommand('post-pr-review-comment', { number, repo, body })
   if (res.error) console.error('[post-pr-review-comment] gh error:', res.error)
-  else           console.log('[post-pr-review-comment] success on', repo, '#', number)
   return res
 })
 

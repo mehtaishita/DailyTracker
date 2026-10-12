@@ -14,10 +14,10 @@ interface Props {
 }
 
 const THEMES: { id: ThemeId; label: string; swatches: string[] }[] = [
-  { id: 'default',  label: 'Default',  swatches: ['#2a2245', '#4dd9d0', '#f472b6', '#c4b5fd'] },
-  { id: 'ocean',    label: 'Ocean',    swatches: ['#091525', '#29ACEA', '#F5A623', '#5E9ED6'] },
-  { id: 'terminal', label: 'Terminal', swatches: ['#060606', '#39ff14', '#00ffaa', '#aaff44'] },
-  { id: 'coastal',  label: 'Coastal',  swatches: ['#031624', '#7bbfe0', '#ff7744', '#44dd80'] },
+  { id: 'default',    label: 'Default',      swatches: ['#2a2245', '#4dd9d0', '#f472b6', '#c4b5fd'] },
+  { id: 'coastal',    label: 'Coastal',      swatches: ['#031624', '#7bbfe0', '#ff7744', '#44dd80'] },
+  { id: 'pan-yellow', label: 'Pan · Yellow', swatches: ['#fffbe6', '#FF218C', '#FFD800', '#21B1FF'] },
+  { id: 'pan-glass',  label: 'Pan · Glass',  swatches: ['#3d5f63', '#FF218C', '#FFD800', '#21B1FF'] },
 ]
 
 type SettingsTab = 'github' | 'jira' | 'sentry' | 'appearance' | 'calendars'
