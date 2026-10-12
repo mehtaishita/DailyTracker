@@ -8,12 +8,32 @@ const os       = require('os')
 const { fork, spawn } = require('child_process')
 const Database = require('better-sqlite3')
 
-const STATE_DIR  = path.join(__dirname, 'data')
+// Data lives in Application Support so `npm run dev` and the packaged app share it.
+// The project's data/ folder is the pre-packaging location, migrated once by initDb().
+const LEGACY_STATE_DIR = path.join(__dirname, 'data')
+const STATE_DIR  = app.getPath('userData')
 const HIST_FILE  = path.join(STATE_DIR, 'history.json')
 const TODOS_FILE = path.join(STATE_DIR, 'todos.json')   // Slack sync inbox (read-only for app)
 const NOTES_FILE = path.join(STATE_DIR, 'notes.json')   // legacy — migrated on first run
 const ENV_FILE   = path.join(__dirname, '.env')
 const DB_FILE    = path.join(STATE_DIR, 'tracker.db')
+
+// Apps launched from the Dock get a minimal PATH (/usr/bin:/bin:…), so gh, sentry
+// and claude wouldn't resolve. Borrow the login shell's PATH plus the usual install dirs.
+if (app.isPackaged) {
+  let shellPath = ''
+  try {
+    shellPath = require('child_process')
+      .execFileSync(process.env.SHELL || '/bin/zsh', ['-lc', 'printf %s "$PATH"'], { timeout: 5000 })
+      .toString()
+  } catch (_) {}
+  const dirs = [
+    ...shellPath.split(':'),
+    '/opt/homebrew/bin', '/usr/local/bin', path.join(os.homedir(), '.local', 'bin'),
+    ...(process.env.PATH || '').split(':'),
+  ]
+  process.env.PATH = [...new Set(dirs.filter(Boolean))].join(':')
+}
 
 let mainWindow
 let lastLoadDate = new Date().toLocaleDateString('en-CA')
@@ -245,8 +265,27 @@ let fileWatcher
 let db
 
 // ── Database ───────────────────────────────────────────────────────────────────
+// One-time copy from the project's data/ folder. VACUUM INTO takes a consistent
+// snapshot even if another instance has the old database open.
+function migrateLegacyStateDir() {
+  const legacyDb = path.join(LEGACY_STATE_DIR, 'tracker.db')
+  if (fs.existsSync(DB_FILE) || !fs.existsSync(legacyDb)) return
+  try {
+    const src = new Database(legacyDb, { readonly: true })
+    src.prepare('VACUUM INTO ?').run(DB_FILE)
+    src.close()
+    for (const f of ['history.json', 'todos.json', 'notes.json']) {
+      const from = path.join(LEGACY_STATE_DIR, f)
+      const to   = path.join(STATE_DIR, f)
+      if (fs.existsSync(from) && !fs.existsSync(to)) fs.copyFileSync(from, to)
+    }
+    console.log('[db] migrated data from', LEGACY_STATE_DIR, 'to', STATE_DIR)
+  } catch (e) { console.error('[db] legacy data migration failed:', e) }
+}
+
 function initDb() {
   fs.mkdirSync(STATE_DIR, { recursive: true })
+  migrateLegacyStateDir()
   db = new Database(DB_FILE)
   db.pragma('journal_mode = WAL')   // safe concurrent access, faster writes
   db.pragma('foreign_keys = ON')
