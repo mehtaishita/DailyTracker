@@ -99,8 +99,11 @@ process.on('message', ({ id, type, params = {} }) => {
       process.send({ id, error: 'pr-diff requires params.number and params.repo' })
       return
     }
-    const allowed = Array.isArray(allowedRepos) && allowedRepos.length > 0 ? allowedRepos : []
-    if (allowed.length === 0 || !allowed.includes(repo)) {
+    // GitHub owner/repo names are case-insensitive (the API returns "Carefeed/admin-portal"
+    // while Settings may store "carefeed/admin-portal"), so compare case-insensitively.
+    const allowed = Array.isArray(allowedRepos) ? allowedRepos.filter(r => typeof r === 'string') : []
+    const repoLc = String(repo).toLowerCase()
+    if (allowed.length === 0 || !allowed.some(r => r.toLowerCase() === repoLc)) {
       process.send({ id, error: `Blocked: repo must be one of ${allowed.join(', ')}` })
       return
     }
