@@ -20,6 +20,7 @@
       "github-service.js",
       "sentry-service.js",
       "quote-service.js",
+      "standup-service.js",
       "dist/renderer/**/*",
       "package.json"
     ],

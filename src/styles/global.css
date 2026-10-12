@@ -857,6 +857,46 @@ body {
   border-left-color: var(--border);
 }
 
+/* ── Stand (Today tab) ───────────────────────────────────────────────────── */
+.stand-group + .stand-group { margin-top: 10px; }
+.stand-group-name {
+  display:        flex;
+  align-items:    center;
+  gap:            6px;
+  margin:         6px 0 2px;
+  font-size:      11px;
+  font-weight:    600;
+  color:          var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.stand-count {
+  font-weight:    500;
+  color:          var(--text-faint);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.stand-row {
+  display:       flex;
+  align-items:   baseline;
+  gap:           8px;
+  padding:       5px 0;
+  font-size:     12.5px;
+  border-bottom: 1px solid var(--border);
+}
+.stand-row:last-child { border-bottom: none; }
+.stand-ref  { flex: 0 0 52px; }   /* fits a 7-char hash, so subjects line up across hash and PR rows */
+.stand-hash {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size:   11px;
+  color:       var(--text-faint);
+}
+.stand-subject { flex: 1; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.stand-ticket-link       { cursor: pointer; }
+.stand-ticket-link:hover { color: var(--text); text-decoration: underline; }
+.stand-row-pr            { cursor: pointer; }
+.stand-row-pr:hover      { background: var(--surface-2); }
+
 /* ── Needs you (Today tab) ────────────────────────────────────────────────── */
 .needs-you-toolbar { display: flex; align-items: center; justify-content: space-between; }
 .needs-you-sub     { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.5px; }

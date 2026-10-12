@@ -8,6 +8,7 @@ const os       = require('os')
 const { fork, spawn } = require('child_process')
 const Database = require('better-sqlite3')
 const { fetchDailyQuote } = require('./quote-service')
+const { fetchStandup } = require('./standup-service')
 
 // Data lives in Application Support so `npm run dev` and the packaged app share it.
 // The project's data/ folder is the pre-packaging location, migrated once by initDb().
@@ -420,7 +421,7 @@ function mergeTodosFromFile() {
 function createWindow() {
   initDb()
   mainWindow = new BrowserWindow({
-    width:           720,
+    width:           700,
     height:          700,
     minWidth:        500,
     minHeight:       300,
@@ -711,6 +712,14 @@ ipcMain.handle('open-url', (_e, url) => {
 
 // libquotes.com Quote of the Day; see quote-service.js
 ipcMain.handle('fetch-daily-quote', () => fetchDailyQuote())
+
+// Stand block: commits since local midnight of `since` in the GitHub tab's watched repos.
+// See standup-service.js.
+ipcMain.handle('fetch-standup', (_e, since) => {
+  if (typeof since !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(since)) return { error: 'failed' }
+  return fetchStandup(since, getRepoList())
+    .then(r => r.error ? r : { standup: r })
+})
 
 ipcMain.handle('fetch-jira-sprint', async () => {
   const { domain, email, token } = getJiraCreds()

@@ -7,6 +7,7 @@ A personal Electron desktop app for staying on top of daily work — meetings, J
 - **Today** — A daily briefing:
   - **Daily quote** — libquotes.com's Quote of the Day, fetched once a day.
   - **Next up** — the next meeting with a live countdown and a Join button.
+  - **Stand** — on Monday, Tuesday and Thursday, what you shipped since the last standup in your watched repos (Settings → GitHub), read from their checkouts under `~/code` via [git-standup](https://github.com/nilbuild/git-standup). Commits are grouped by the Jira ticket in their subject (click a ticket to open it); each refresh fetches first, so PRs merged on GitHub appear too, marked and clickable. Monday covers Thursday onward, Tuesday covers Monday onward, Thursday covers Tuesday onward.
   - **Needs you** — GitHub PRs with unread activity (mentions, comments, activity on your PRs), PRs awaiting your review, and your approved PRs ready to merge; plus Jira tickets with comments you haven't seen. Each row can be marked as read.
   - **Meetings** — today's schedule, with past meetings dimmed.
 - **Calendar** — Week or month view of meetings from ICS/Outlook calendar URLs, with meeting link detection. Opens on the current week with today's agenda.

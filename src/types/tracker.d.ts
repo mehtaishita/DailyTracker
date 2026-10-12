@@ -123,6 +123,26 @@ export interface DailyQuote {
   authorUrl: string | null   // author page on libquotes.com
 }
 
+export interface StandupCommit {
+  hash:    string
+  subject: string
+  date:    string        // ISO 8601 committer date
+  author:  string
+  pr:      number | null // set when this is a squash-merge commit, from the "(#1234)" suffix
+}
+
+export interface StandupRepo {
+  full:    string   // owner/repo, as in the watched list
+  name:    string
+  path:    string
+  commits: StandupCommit[]
+}
+
+export interface Standup {
+  since: string   // YYYY-MM-DD, first day of the recap window
+  repos: StandupRepo[]
+}
+
 export type AlertMode = 'alarm' | 'flash' | 'none'
 export type TabId    = 'today' | 'tasks' | 'calendar' | 'jira' | 'github' | 'sentry' | 'notes' | 'settings'
 export type ThemeId  = 'default' | 'coastal' | 'pan-yellow' | 'pan-glass'
@@ -145,6 +165,7 @@ declare global {
       readHistory:          ()                             => Promise<Record<string, HistoryDay>>
       fetchICSRange:        (start: string, end: string)  => Promise<Record<string, Meeting[]>>
       fetchDailyQuote:      ()                             => Promise<{ quote?: DailyQuote; error?: string }>
+      fetchStandup:         (since: string)                => Promise<{ standup?: Standup; error?: string }>
       readNotes:            ()                             => Promise<Record<string, string>>
       writeNote:            (date: string, text: string)  => Promise<boolean>
       fetchJiraSprint:           ()                                              => Promise<{ issues?: JiraIssue[]; error?: string }>
