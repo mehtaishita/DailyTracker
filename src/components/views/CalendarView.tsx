@@ -25,6 +25,7 @@ export default function CalendarView({ todos, notesData, calHistory, onHistoryLo
   })
   const [icsCache,   setIcsCache]   = useState<ICSCache>({})
   const [syncing,    setSyncing]    = useState(false)
+  const [loadingICS, setLoadingICS] = useState(true)
   const fetchingRef  = useRef<string>('')
 
   async function fetchICSForMonth(y: number, m: number) {
@@ -37,8 +38,14 @@ export default function CalendarView({ todos, notesData, calHistory, onHistoryLo
     const key = `${startStr}/${endStr}`
     if (fetchingRef.current === key) return
     fetchingRef.current = key
-    const result = await window.tracker.fetchICSRange(startStr, endStr)
-    setIcsCache(prev => ({ ...prev, ...result }))
+    setLoadingICS(true)
+    try {
+      const result = await window.tracker.fetchICSRange(startStr, endStr)
+      setIcsCache(prev => ({ ...prev, ...result }))
+    } finally {
+      // Only clear if a newer fetch hasn't started in the meantime
+      if (fetchingRef.current === key) setLoadingICS(false)
+    }
   }
 
   useEffect(() => {
@@ -199,6 +206,7 @@ export default function CalendarView({ todos, notesData, calHistory, onHistoryLo
           currentMonth={month}
           onResync={resync}
           syncing={syncing}
+          loading={loadingICS}
         />
       )}
       </div>
@@ -207,7 +215,7 @@ export default function CalendarView({ todos, notesData, calHistory, onHistoryLo
 }
 
 function DayDetail({
-  dStr, todos, notesData, calHistory, icsCache, onResync, syncing,
+  dStr, todos, notesData, calHistory, icsCache, onResync, syncing, loading,
 }: {
   dStr:         string
   todos:        Todo[]
@@ -217,6 +225,7 @@ function DayDetail({
   currentMonth: number
   onResync:     () => void
   syncing:      boolean
+  loading:      boolean
 }) {
   const d         = new Date(dStr + 'T12:00:00')
   const label     = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
@@ -242,7 +251,7 @@ function DayDetail({
           <div className="cal-detail-date">{label}</div>
           <button className={`refresh-btn${syncing ? ' spinning' : ''}`} onClick={onResync} title="Resync calendars">↻</button>
         </div>
-        <div className="cal-none">Weekend</div>
+        <div className="cal-none">Enjoy your weekend slut!</div>
       </div>
     )
   }
@@ -283,6 +292,11 @@ function DayDetail({
               </div>
             </div>
           ))}
+        </>
+      ) : isToday && loading ? (
+        <>
+          <div className="cal-section-title">Meetings</div>
+          <div className="cal-none">Loading meetings…</div>
         </>
       ) : isFuture && !isWeekend ? (
         <>
