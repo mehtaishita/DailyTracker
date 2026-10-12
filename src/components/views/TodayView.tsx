@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import CollapsibleSection from '../CollapsibleSection'
+import DailyQuote from '../DailyQuote'
 import type { Meeting, NeedsYouPR, NeedsYouJira } from '../../types/tracker'
 
 // A meeting that started this recently still counts as "now" for the Next up card
@@ -191,6 +192,7 @@ export default function TodayView({ meetings }: Props) {
     <div id="view-today" className="view">
       <div className="view-card">
       <div className="list-wrap">
+        <DailyQuote />
         <NextUp meetings={meetings} />
 
         <CollapsibleSection label="Needs you" colorClass="group-progress">

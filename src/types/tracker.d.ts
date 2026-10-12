@@ -117,6 +117,12 @@ export interface IssueDetail {
   tags:      { key: string; value: string }[]
 }
 
+export interface DailyQuote {
+  text:      string
+  author:    string
+  authorUrl: string | null   // author page on libquotes.com
+}
+
 export type AlertMode = 'alarm' | 'flash' | 'none'
 export type TabId    = 'today' | 'tasks' | 'calendar' | 'jira' | 'github' | 'sentry' | 'notes' | 'settings'
 export type ThemeId  = 'default' | 'coastal' | 'pan-yellow' | 'pan-glass'
@@ -138,6 +144,7 @@ declare global {
       writeTodos:           (todos: Todo[])                => Promise<boolean>
       readHistory:          ()                             => Promise<Record<string, HistoryDay>>
       fetchICSRange:        (start: string, end: string)  => Promise<Record<string, Meeting[]>>
+      fetchDailyQuote:      ()                             => Promise<{ quote?: DailyQuote; error?: string }>
       readNotes:            ()                             => Promise<Record<string, string>>
       writeNote:            (date: string, text: string)  => Promise<boolean>
       fetchJiraSprint:           ()                                              => Promise<{ issues?: JiraIssue[]; error?: string }>

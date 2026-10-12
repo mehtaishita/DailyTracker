@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('tracker', {
   writeTodos:      (todos)               => ipcRenderer.invoke('write-todos', todos),
   readHistory:     ()                    => ipcRenderer.invoke('read-history'),
   fetchICSRange:   (startStr, endStr)    => ipcRenderer.invoke('fetch-ics-range', startStr, endStr),
+  fetchDailyQuote: ()                    => ipcRenderer.invoke('fetch-daily-quote'),
   readNotes:       ()                    => ipcRenderer.invoke('read-notes'),
   writeNote:       (dateStr, text)       => ipcRenderer.invoke('write-note', dateStr, text),
   fetchJiraSprint:       ()                           => ipcRenderer.invoke('fetch-jira-sprint'),

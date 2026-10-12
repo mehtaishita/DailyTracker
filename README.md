@@ -5,6 +5,7 @@ A personal Electron desktop app for staying on top of daily work — meetings, J
 ## Features
 
 - **Today** — A daily briefing:
+  - **Daily quote** — libquotes.com's Quote of the Day, fetched once a day.
   - **Next up** — the next meeting with a live countdown and a Join button.
   - **Needs you** — GitHub PRs with unread activity (mentions, comments, activity on your PRs), PRs awaiting your review, and your approved PRs ready to merge; plus Jira tickets with comments you haven't seen. Each row can be marked as read.
   - **Meetings** — today's schedule, with past meetings dimmed.

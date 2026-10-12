@@ -19,6 +19,7 @@
       "preload.js",
       "github-service.js",
       "sentry-service.js",
+      "quote-service.js",
       "dist/renderer/**/*",
       "package.json"
     ],

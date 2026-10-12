@@ -7,6 +7,7 @@ const https    = require('https')
 const os       = require('os')
 const { fork, spawn } = require('child_process')
 const Database = require('better-sqlite3')
+const { fetchDailyQuote } = require('./quote-service')
 
 // Data lives in Application Support so `npm run dev` and the packaged app share it.
 // The project's data/ folder is the pre-packaging location, migrated once by initDb().
@@ -707,6 +708,9 @@ ipcMain.handle('open-url', (_e, url) => {
   if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://')))
     shell.openExternal(url)
 })
+
+// libquotes.com Quote of the Day; see quote-service.js
+ipcMain.handle('fetch-daily-quote', () => fetchDailyQuote())
 
 ipcMain.handle('fetch-jira-sprint', async () => {
   const { domain, email, token } = getJiraCreds()
