@@ -24,8 +24,10 @@ const COMMIT_LINE = /^([0-9a-f]{7,40}) - (.*) \(([^()]+)\) <([^<>]*)>\s*(?:\\n)?
 // GitHub appends the PR number to a squash-merge commit's subject: "Title (#1234)"
 const PR_SUFFIX = /\(#(\d+)\)\s*$/
 
-// git must never wait for a password or host-key answer; there is no terminal to type into
-const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -oBatchMode=yes' }
+// git must never wait for a password or host-key answer; there is no terminal to type into.
+// Built per call, not at load: main.js requires this module before it widens PATH for the
+// packaged app, so a load-time snapshot would still have the Dock's minimal PATH.
+const gitEnv = () => ({ ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -oBatchMode=yes' })
 
 // Commit lines from one checkout's git-standup output
 function parseCommits(out) {
@@ -46,7 +48,7 @@ function parseCommits(out) {
 function runGitStandup(cwd, since) {
   const args = ['-f', '-A', `${since} 00:00:00`, '-D', 'iso-strict', '-s']
   return new Promise((resolve) => {
-    execFile('git-standup', args, { cwd, env: GIT_ENV, timeout: 120000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile('git-standup', args, { cwd, env: gitEnv(), timeout: 120000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err && err.code === 'ENOENT') return resolve({ error: 'not_installed' })
       if (err) {
         console.error(`[standup] git-standup failed in ${cwd}:`, stderr || err.message)
