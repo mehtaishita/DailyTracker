@@ -1,7 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, powerMonitor, nativeImage, safeStorage } = require('electron')
 const path     = require('path')
 const fs       = require('fs')
-const zlib     = require('zlib')
 const http     = require('http')
 const https    = require('https')
 const os       = require('os')
@@ -39,217 +38,6 @@ if (app.isPackaged) {
 
 let mainWindow
 let lastLoadDate = new Date().toLocaleDateString('en-CA')
-
-// ── Dock icon generator ────────────────────────────────────────────────────────
-// Generates a 512×512 RGBA PNG using the griddy-icons StickyNote design on
-// the app's dark rounded-square background. Uses only built-in Node modules.
-function generateDockIcon(outPath) {
-  const W = 512, H = 512
-  const buf = Buffer.alloc(W * H * 4, 0)
-
-  function draw(x, y, r, g, b, a) {
-    if (x < 0 || x >= W || y < 0 || y >= H) return
-    const i = (y * W + x) * 4
-    const sa = a / 255, da = buf[i + 3] / 255
-    const oa = sa + da * (1 - sa)
-    if (oa < 1e-6) return
-    buf[i]     = Math.round((r * sa + buf[i]     * da * (1 - sa)) / oa)
-    buf[i + 1] = Math.round((g * sa + buf[i + 1] * da * (1 - sa)) / oa)
-    buf[i + 2] = Math.round((b * sa + buf[i + 2] * da * (1 - sa)) / oa)
-    buf[i + 3] = Math.round(oa * 255)
-  }
-
-  function rrSDF(px, py, cx, cy, hw, hh, r) {
-    const qx = Math.abs(px - cx) - (hw - r)
-    const qy = Math.abs(py - cy) - (hh - r)
-    return Math.sqrt(Math.max(qx, 0) ** 2 + Math.max(qy, 0) ** 2) - r
-  }
-
-  const CX = 256, CY = 256, HW = 228, HH = 228, CR = 104
-
-  function cornerBright(px, py) {
-    const dx = (px - CX) / HW, dy = (py - CY) / HH
-    const len = Math.hypot(dx, dy) || 1
-    return Math.min(0.80, 0.38 + Math.max(0, (dx / len) * (-dy / len)) * 0.84)
-  }
-
-  // Pass 1: outer glow
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const d = rrSDF(x, y, CX, CY, HW, HH, CR)
-    if (d > 0 && d < 22) {
-      const alpha = Math.round((1 - d / 22) ** 1.8 * cornerBright(x, y) * 155)
-      if (alpha > 0) draw(x, y, 255, 245, 255, alpha)
-    }
-  }
-
-  // Pass 2: dark background
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const d = rrSDF(x, y, CX, CY, HW, HH, CR)
-    if (d < 0.5) draw(x, y, 18, 14, 34, d < -0.5 ? 255 : Math.round((0.5 - d) * 255))
-  }
-
-  // Pass 3: radial center highlight
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const d = rrSDF(x, y, CX, CY, HW, HH, CR)
-    if (d >= 0) continue
-    const nx = (x - CX) / HW, ny = (y - (CY - 20)) / HH
-    const alpha = Math.round(Math.max(0, (1 - nx * nx - ny * ny) ** 1.4) * 40)
-    if (alpha > 0) draw(x, y, 255, 252, 255, alpha)
-  }
-
-  // Pass 4: rim light
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const d = rrSDF(x, y, CX, CY, HW, HH, CR)
-    if (d < 0 && d > -9) {
-      const alpha = Math.round((1 + d / 9) ** 1.5 * cornerBright(x, y) * 110)
-      if (alpha > 0) draw(x, y, 255, 248, 255, alpha)
-    }
-  }
-
-  // ── Pass 5: StickyNote icon (griddy-icons path, 24×24 viewBox) ──────────────
-  // SVG path: M3 3v18h11.56L21 14.56V3H3  (note body — pentagon)
-  //           M18.44 15 15 18.44V15h3.44Z  (fold flap — triangle)
-  //
-  // Scale 24 SVG units → ICON_PX pixels, centered in the 512 canvas.
-  const ICON_PX = 272
-  const SC  = ICON_PX / 24
-  const IX  = CX - ICON_PX / 2   // canvas x of SVG origin
-  const IY  = CY - ICON_PX / 2   // canvas y of SVG origin
-
-  // Convert SVG unit coords to canvas pixels
-  function s(sx, sy) { return [IX + sx * SC, IY + sy * SC] }
-
-  // Scanline polygon fill with per-pixel edge coverage (anti-aliasing)
-  function fillPoly(verts, r, g, b) {
-    const n   = verts.length
-    const ys  = verts.map(v => v[1])
-    const minY = Math.floor(Math.min(...ys))
-    const maxY = Math.ceil(Math.max(...ys))
-    for (let y = minY; y <= maxY; y++) {
-      const xs = []
-      for (let i = 0, j = n - 1; i < n; j = i++) {
-        const [x1, y1] = verts[i], [x2, y2] = verts[j]
-        if (Math.min(y1, y2) < y + 0.5 && y + 0.5 < Math.max(y1, y2))
-          xs.push(x1 + (y + 0.5 - y1) / (y2 - y1) * (x2 - x1))
-      }
-      xs.sort((a, b) => a - b)
-      for (let k = 0; k + 1 < xs.length; k += 2) {
-        const x0 = xs[k], x1 = xs[k + 1]
-        for (let x = Math.floor(x0); x <= Math.ceil(x1); x++) {
-          const cov = Math.min(x + 1, x1) - Math.max(x, x0)
-          if (cov > 0) draw(x, y, r, g, b, Math.round(Math.min(1, cov) * 255))
-        }
-      }
-    }
-  }
-
-  // Note body: pentagon [3,3]→[21,3]→[21,14.56]→[14.56,21]→[3,21]
-  // Lavender (#c4b5fd = 196,181,253) with a subtle top→bottom gradient
-  const noteVerts = [[3,3],[21,3],[21,14.56],[14.56,21],[3,21]].map(([x,y]) => s(x,y))
-  const [, noteTopY]    = s(0, 3)
-  const [, noteBottomY] = s(0, 21)
-  const noteH = noteBottomY - noteTopY
-
-  const n = noteVerts.length
-  const noteYs = noteVerts.map(v => v[1])
-  const noteMinY = Math.floor(Math.min(...noteYs))
-  const noteMaxY = Math.ceil(Math.max(...noteYs))
-  for (let y = noteMinY; y <= noteMaxY; y++) {
-    const xs = []
-    for (let i = 0, j = n - 1; i < n; j = i++) {
-      const [x1, y1] = noteVerts[i], [x2, y2] = noteVerts[j]
-      if (Math.min(y1, y2) < y + 0.5 && y + 0.5 < Math.max(y1, y2))
-        xs.push(x1 + (y + 0.5 - y1) / (y2 - y1) * (x2 - x1))
-    }
-    xs.sort((a, b) => a - b)
-    // Gradient: lavender at top → soft lavender-pink at bottom
-    const t   = Math.max(0, Math.min(1, (y - noteTopY) / noteH))
-    const gr  = Math.round(196 + t * 22)   // 196 → 218
-    const gg  = Math.round(181 - t * 12)   // 181 → 169
-    const gb  = Math.round(253 - t * 30)   // 253 → 223
-    for (let k = 0; k + 1 < xs.length; k += 2) {
-      const x0 = xs[k], x1 = xs[k + 1]
-      for (let x = Math.floor(x0); x <= Math.ceil(x1); x++) {
-        const cov = Math.min(x + 1, x1) - Math.max(x, x0)
-        if (cov > 0) draw(x, y, gr, gg, gb, Math.round(Math.min(1, cov) * 255))
-      }
-    }
-  }
-
-  // Fold shadow: draw a slightly darker strip just above the fold diagonal
-  // (simulates depth under the lifted corner — subtle lavender-dark layer)
-  const [foldPX, foldPY] = s(14.56, 21)
-  const [foldQX, foldQY] = s(21, 14.56)
-  const shadowVerts = [
-    s(13.5, 21), s(21, 13.5), s(21, 14.56), s(14.56, 21)
-  ]
-  fillPoly(shadowVerts, 140, 115, 210)
-
-  // Fold flap: triangle [15,15]→[18.44,15]→[15,18.44] — pink (#ff7eb3 = 255,126,179)
-  fillPoly([[15,15],[18.44,15],[15,18.44]].map(([x,y]) => s(x,y)), 255, 126, 179)
-
-  // Ruled lines on the note (horizontal, lavender-dim, clipped to note body)
-  for (let svy = 8.5; svy <= 18; svy += 3) {
-    const ly = Math.round(s(0, svy)[1])
-    // Right boundary at this y: follow the diagonal edge if below fold junction
-    let svxR = 19.5
-    if (svy > 14.56) {
-      // Interpolate the diagonal edge x for this y
-      svxR = Math.min(svxR, 21 + (svy - 14.56) * (14.56 - 21) / (21 - 14.56) - 0.5)
-    }
-    if (svy > 15) svxR = Math.min(svxR, 14.2)  // don't cross into fold area
-    const lx0 = Math.ceil(s(4.5, 0)[0])
-    const lx1 = Math.floor(s(svxR, 0)[0])
-    for (let x = lx0; x <= lx1; x++) draw(x, ly, 148, 115, 220, 170)
-  }
-
-  // Three small teal dots (task bullets) on the left of the lines
-  const DOT_R = Math.round(SC * 0.55), DOT_X = Math.round(s(5.5, 0)[0])
-  for (let svy = 8.5; svy <= 14.5; svy += 3) {
-    const dotY = Math.round(s(0, svy)[1])
-    for (let dy = -DOT_R; dy <= DOT_R; dy++) for (let dx = -DOT_R; dx <= DOT_R; dx++) {
-      const dist = Math.hypot(dx, dy)
-      if (dist < DOT_R) draw(DOT_X + dx, dotY + dy, 93, 217, 209, 230)
-    }
-  }
-
-  // PNG encode (pure Node.js — zlib + manual chunk writing)
-  const crcT = new Uint32Array(256)
-  for (let n = 0; n < 256; n++) {
-    let c = n
-    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1)
-    crcT[n] = c
-  }
-  const crc32 = b => {
-    let c = 0xFFFFFFFF
-    for (let i = 0; i < b.length; i++) c = crcT[(c ^ b[i]) & 0xff] ^ (c >>> 8)
-    return (c ^ 0xFFFFFFFF) >>> 0
-  }
-  const u32 = n => { const b = Buffer.alloc(4); b.writeUInt32BE(n); return b }
-  const pngChunk = (type, data) => {
-    const t = Buffer.from(type)
-    return Buffer.concat([u32(data.length), t, data, u32(crc32(Buffer.concat([t, data])))])
-  }
-
-  const ihdr = Buffer.alloc(13)
-  ihdr.writeUInt32BE(W, 0); ihdr.writeUInt32BE(H, 4); ihdr[8] = 8; ihdr[9] = 6  // 8-bit RGBA
-
-  // Each PNG scanline is prefixed with a filter byte (0 = None)
-  const rows = Buffer.alloc(H * (W * 4 + 1))
-  for (let y = 0; y < H; y++) {
-    const off = y * (W * 4 + 1)
-    rows[off] = 0
-    buf.copy(rows, off + 1, y * W * 4, (y + 1) * W * 4)
-  }
-
-  fs.mkdirSync(path.dirname(outPath), { recursive: true })
-  fs.writeFileSync(outPath, Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),  // PNG signature
-    pngChunk('IHDR', ihdr),
-    pngChunk('IDAT', zlib.deflateSync(rows, { level: 6 })),
-    pngChunk('IEND', Buffer.alloc(0)),
-  ]))
-}
 
 function scheduleDailyRefresh() {
   const now    = new Date()
@@ -1648,12 +1436,11 @@ function parseICSDate(val, tzid = '') {
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
-  // Set Dock icon (macOS only); regenerated each launch so icon changes take effect
-  if (process.platform === 'darwin') {
+  // Dock icon in dev (macOS only). The packaged app gets its icon from the
+  // .icns that electron-builder generates from assets/icon.png.
+  if (process.platform === 'darwin' && !app.isPackaged) {
     try {
-      const iconPath = path.join(STATE_DIR, 'icon.png')
-      generateDockIcon(iconPath)
-      app.dock.setIcon(nativeImage.createFromPath(iconPath))
+      app.dock.setIcon(nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png')))
     } catch (e) { console.error('[icon] failed to set dock icon:', e) }
   }
 
