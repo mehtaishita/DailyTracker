@@ -745,6 +745,56 @@ body {
   flex-shrink: 0;
 }
 
+/* ── Next up card (Today tab) ─────────────────────────────────────────────── */
+.next-up {
+  display:       flex;
+  align-items:   center;
+  gap:           12px;
+  margin:        14px 0 10px;
+  padding:       12px 14px;
+  background:    var(--teal-dim);
+  border:        1px solid var(--teal-glow);
+  border-left:   3px solid var(--teal);
+  border-radius: var(--radius);
+}
+.next-up-live { background: var(--pink-dim); border-color: var(--pink-glow); border-left-color: var(--pink); }
+.next-up-empty { color: var(--text-faint); font-size: 12.5px; background: var(--surface-2); border-color: var(--border); border-left-color: var(--border); }
+.next-up-info  { flex: 1; min-width: 0; }
+.next-up-label { font-size: 10.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.next-up-title { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.next-up-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.next-up-when  { font-size: 13px; font-weight: 600; color: var(--teal); white-space: nowrap; }
+.next-up-live .next-up-when { color: var(--pink); }
+.next-up-join  { font-size: 12px; padding: 4px 12px; }
+
+/* ── Needs you (Today tab) ────────────────────────────────────────────────── */
+.needs-you-toolbar { display: flex; align-items: center; justify-content: space-between; }
+.needs-you-sub     { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.5px; }
+.needs-you-row {
+  display:       flex;
+  align-items:   center;
+  gap:           8px;
+  padding:       7px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size:     12.5px;
+  cursor:        pointer;
+}
+.needs-you-row:last-child { border-bottom: none; }
+.needs-you-row:hover      { background: var(--surface-2); }
+.needs-you-dot            { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.needs-you-dot.unread     { background: var(--pink); }
+.needs-you-title          { flex: 1; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.needs-you-time           { font-size: 11px; color: var(--text-faint); white-space: nowrap; flex-shrink: 0; }
+.needs-you-toolbar-next   { margin-top: 12px; min-height: 26px; }
+.needs-you-read-btn {
+  opacity: 0; background: transparent; border: 1px solid var(--border);
+  color: var(--teal); font-size: 11px; line-height: 1;
+  cursor: pointer; padding: 3px 6px; border-radius: 4px; flex-shrink: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.needs-you-row:hover .needs-you-read-btn { opacity: 0.7; }
+.needs-you-read-btn:hover               { opacity: 1 !important; background: var(--teal-dim); }
+
 /* ── Calendar view ────────────────────────────────────────────────────────── */
 /* ── Calendar nav bar ─────────────────────────────────────────────────────── */
 .cal-nav {

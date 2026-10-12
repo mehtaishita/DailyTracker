@@ -14,6 +14,13 @@ const COMMANDS = {
   'review-requested': [
     'search', 'prs', '--review-requested=@me', '--state=open', '--json', FIELDS, '--limit', '200',
   ],
+  'my-approved': [
+    'search', 'prs', '--author=@me', '--state=open', '--review=approved', '--json', FIELDS, '--limit', '50',
+  ],
+  // Unread notification threads only (GitHub tracks read state)
+  'notifications': [
+    'api', 'notifications?per_page=50',
+  ],
 }
 
 process.on('message', ({ id, type, params = {} }) => {
@@ -43,6 +50,21 @@ process.on('message', ({ id, type, params = {} }) => {
     execFile(
       'gh', ['pr', 'review', String(number), '--comment', '-b', body, '-R', repo],
       { timeout: 15000, maxBuffer: 1024 * 1024 },
+      (err, stdout, stderr) => {
+        if (err) { process.send({ id, error: stderr || err.message }); return }
+        process.send({ id, data: true })
+      }
+    )
+    return
+  }
+
+  // mark-thread-read: mark one notification thread as read on GitHub
+  if (type === 'mark-thread-read') {
+    const { threadId } = params
+    if (!/^\d+$/.test(String(threadId || ''))) { process.send({ id, error: 'invalid threadId' }); return }
+    execFile(
+      'gh', ['api', '-X', 'PATCH', `notifications/threads/${threadId}`],
+      { timeout: 10000 },
       (err, stdout, stderr) => {
         if (err) { process.send({ id, error: stderr || err.message }); return }
         process.send({ id, data: true })

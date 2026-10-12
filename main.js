@@ -278,6 +278,10 @@ function initDb() {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL DEFAULT ''
     );
+    CREATE TABLE IF NOT EXISTS jira_seen (
+      issue_key TEXT PRIMARY KEY,
+      seen_at   INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS sentry_skill_runs (
       issue_tag  TEXT NOT NULL,
       skill_name TEXT NOT NULL,
@@ -736,6 +740,95 @@ ipcMain.handle('fetch-jira-filter-issues', async (_e, filterId, nextPageToken) =
   }
 })
 
+// ── Today: Jira tickets with comments you haven't seen ──────────────────────────
+// Jira has no public read/unread API, so "seen" is tracked locally: a ticket is
+// seen when you open it from this app (jira_seen) or when you comment on it.
+
+const JIRA_LOOKBACK_DAYS = 14
+const JIRA_KEY_RE        = /^[A-Z][A-Z0-9_]*-\d+$/
+
+let _jiraAccountId = null
+async function getJiraAccountId(cloudId, headers) {
+  if (_jiraAccountId) return _jiraAccountId
+  const me = await makeHttpsGet(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/myself`, headers)
+  if (me?.accountId) return (_jiraAccountId = me.accountId)
+  // Scoped tokens may lack read:jira-user — fall back to a ticket you reported
+  const res = await makeHttpsPost(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/search/jql`, headers, {
+    jql: 'reporter = currentUser() ORDER BY created DESC', fields: ['reporter'], maxResults: 1,
+  })
+  return (_jiraAccountId = res?.issues?.[0]?.fields?.reporter?.accountId || null)
+}
+
+// Jira timestamps look like 2026-10-12T10:00:00.000-0400
+function parseJiraTime(s) {
+  return Date.parse(String(s).replace(/([+-]\d{2})(\d{2})$/, '$1:$2')) || 0
+}
+
+// Comments older than this are treated as seen, so the first run isn't flooded
+function getJiraSeenBaseline() {
+  const saved = Number(readSetting('jira_seen_baseline'))
+  if (saved) return saved
+  const baseline = Date.now() - 24 * 60 * 60 * 1000
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('jira_seen_baseline', String(baseline))
+  return baseline
+}
+
+ipcMain.handle('fetch-jira-needs-you', async () => {
+  const { domain, email, token } = getJiraCreds()
+  if (!domain || !email || !token || domain.startsWith('<')) return { issues: [], error: 'not_configured' }
+
+  const auth    = Buffer.from(`${email}:${token}`).toString('base64')
+  const headers = { 'Authorization': `Basic ${auth}`, 'Accept': 'application/json' }
+
+  const cloudId = await getCloudId(domain)
+  if (!cloudId) return { issues: [], error: 'Could not resolve cloud ID from ' + domain }
+
+  const myId = await getJiraAccountId(cloudId, headers)
+  if (!myId) return { issues: [], error: 'Could not determine your Jira account' }
+
+  const data = await makeHttpsPost(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/search/jql`, headers, {
+    jql:        `(assignee = currentUser() OR reporter = currentUser() OR watcher = currentUser()) AND updated >= -${JIRA_LOOKBACK_DAYS}d ORDER BY updated DESC`,
+    fields:     ['summary', 'status', 'comment'],
+    maxResults: 50,
+  })
+  if (!data)        return { issues: [], error: 'fetch_failed' }
+  if (!data.issues) return { issues: [], error: data.errorMessages?.[0] || JSON.stringify(data)?.slice(0, 200) }
+
+  const baseline = getJiraSeenBaseline()
+  const seenRows = db.prepare('SELECT issue_key, seen_at FROM jira_seen').all()
+  const seenMap  = Object.fromEntries(seenRows.map(r => [r.issue_key, r.seen_at]))
+
+  const issues = []
+  for (const i of data.issues) {
+    const comments = i.fields.comment?.comments || []
+    const myLast   = Math.max(0, ...comments.filter(c => c.author?.accountId === myId).map(c => parseJiraTime(c.created)))
+    const seenAt   = Math.max(baseline, seenMap[i.key] || 0, myLast)
+    const fresh    = comments.filter(c => c.author?.accountId !== myId && parseJiraTime(c.created) > seenAt)
+    if (fresh.length === 0) continue
+    const latest = fresh[fresh.length - 1]
+    issues.push({
+      key:          i.key,
+      title:        i.fields.summary,
+      status:       i.fields.status?.name || '',
+      url:          `https://${domain}/browse/${i.key}`,
+      newCount:     fresh.length,
+      latestAt:     new Date(parseJiraTime(latest.created)).toISOString(),
+      latestAuthor: latest.author?.displayName || '',
+    })
+  }
+  issues.sort((a, b) => b.latestAt.localeCompare(a.latestAt))
+
+  return { issues, error: null }
+})
+
+ipcMain.handle('mark-jira-seen', (_e, key) => {
+  if (typeof key !== 'string' || !JIRA_KEY_RE.test(key)) return false
+  try {
+    db.prepare('INSERT OR REPLACE INTO jira_seen (issue_key, seen_at) VALUES (?, ?)').run(key, Date.now())
+    return true
+  } catch (e) { console.error('[db] mark-jira-seen:', e); return false }
+})
+
 // ── GitHub microservice client ─────────────────────────────────────────────────
 // Forks github-service.js once; sends typed messages; resolves by message id.
 let _ghService = null
@@ -918,6 +1011,80 @@ ipcMain.handle('fetch-github', async () => {
     openPRs: allRaw.filter(pr => !myUrls.has(pr.url) && !reviewUrls.has(pr.url)).map(mapPR),
     error:   null,
   }
+})
+
+// ── Today: "Needs you" ────────────────────────────────────────────────────────
+// PRs needing attention: unread GitHub notifications (GitHub tracks read state,
+// cleared when you view the PR), open review requests, and your approved PRs.
+
+const NOTIFICATION_REASONS = {
+  mention:          'Mentioned',
+  team_mention:     'Team mentioned',
+  comment:          'New comments',
+  author:           'Activity on your PR',
+  review_requested: 'Review requested',
+  assign:           'Assigned',
+  state_change:     'State changed',
+}
+
+ipcMain.handle('fetch-needs-you', async () => {
+  const [notifRes, reviewReqRes, approvedRes] = await Promise.all([
+    ghCommand('notifications'),
+    ghCommand('review-requested'),
+    ghCommand('my-approved'),
+  ])
+
+  if (notifRes.error && reviewReqRes.error && approvedRes.error)
+    return { prs: [], error: notifRes.error }
+
+  // searchReasons are the ones that stay after the notification is marked read
+  const byUrl = new Map()
+  function add(url, fields, reason, fromSearch) {
+    const item = byUrl.get(url) || { url, reasons: [], searchReasons: [], unread: false, threadId: null, updatedAt: null, ...fields }
+    if (!item.reasons.includes(reason)) item.reasons.push(reason)
+    if (fromSearch && !item.searchReasons.includes(reason)) item.searchReasons.push(reason)
+    byUrl.set(url, item)
+    return item
+  }
+
+  for (const n of (notifRes.data || [])) {
+    if (n.subject?.type !== 'PullRequest') continue
+    const m = n.subject.url?.match(/repos\/([^/]+\/[^/]+)\/pulls\/(\d+)$/)
+    if (!m) continue
+    const item = add(
+      `https://github.com/${m[1]}/pull/${m[2]}`,
+      { title: n.subject.title, repo: m[1], number: Number(m[2]) },
+      NOTIFICATION_REASONS[n.reason] || 'New activity',
+      false,
+    )
+    item.unread    = true
+    item.threadId  = n.id
+    item.updatedAt = n.updated_at
+  }
+
+  for (const pr of (reviewReqRes.data || [])) {
+    if (pr.isDraft) continue
+    add(pr.url, { title: pr.title, repo: pr.repository?.nameWithOwner || '', number: pr.number }, 'Review requested', true)
+  }
+
+  for (const pr of (approvedRes.data || [])) {
+    add(pr.url, { title: pr.title, repo: pr.repository?.nameWithOwner || '', number: pr.number }, 'Approved — ready to merge', true)
+  }
+
+  // Unread activity first (newest first), then review requests, then approved
+  const prs = [...byUrl.values()].sort((a, b) => {
+    if (a.unread !== b.unread) return a.unread ? -1 : 1
+    if (a.unread) return (b.updatedAt || '').localeCompare(a.updatedAt || '')
+    return a.reasons.includes('Review requested') === b.reasons.includes('Review requested')
+      ? 0 : a.reasons.includes('Review requested') ? -1 : 1
+  })
+
+  return { prs, error: null }
+})
+
+ipcMain.handle('mark-github-read', async (_e, threadId) => {
+  const res = await ghCommand('mark-thread-read', { threadId })
+  return { error: res.error || null }
 })
 
 // ── Claude Review IPC ─────────────────────────────────────────────────────────

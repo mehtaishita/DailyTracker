@@ -1,6 +1,6 @@
 import React from 'react'
 import Nav from 'react-bootstrap/Nav'
-import { CheckCircle, Calendar, Ticket, Github, AlertTriangle, StickyNote, Settings } from 'griddy-icons'
+import { Sun, CheckCircle, Calendar, Ticket, Github, AlertTriangle, StickyNote, Settings } from 'griddy-icons'
 import type { TabId } from '../types/tracker'
 
 interface Tab {
@@ -10,12 +10,13 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { id: 'today',    label: 'Today',    Icon: CheckCircle },
+  { id: 'today',    label: 'Today',    Icon: Sun         },
   { id: 'calendar', label: 'Calendar', Icon: Calendar    },
   { id: 'jira',     label: 'Jira',     Icon: Ticket      },
   { id: 'github',   label: 'GitHub',   Icon: Github        },
   { id: 'sentry',   label: 'Sentry',   Icon: AlertTriangle },
   { id: 'notes',    label: 'Notes',    Icon: StickyNote    },
+  { id: 'tasks',    label: 'Tasks',    Icon: CheckCircle },
   { id: 'settings', label: 'Settings', Icon: Settings    },
 ]
 

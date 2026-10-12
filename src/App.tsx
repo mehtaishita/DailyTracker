@@ -3,6 +3,7 @@ import TabBar from './components/TabBar'
 import AppHeader from './components/AppHeader'
 import MeetingAlert from './components/MeetingAlert'
 import TodayView from './components/views/TodayView'
+import TasksView from './components/views/TasksView'
 import CalendarView from './components/views/CalendarView'
 import JiraView from './components/views/JiraView'
 import GithubView from './components/views/GithubView'
@@ -146,10 +147,11 @@ export default function App() {
         </div>
         <div className="frame-content">
           {currentTab === 'today' && (
-            <TodayView
+            <TodayView meetings={meetings} />
+          )}
+          {currentTab === 'tasks' && (
+            <TasksView
               todos={todos}
-              meetings={meetings}
-              notesData={notesData}
               calHistory={calHistory}
               onToggle={handleToggle}
               onRemove={handleRemove}

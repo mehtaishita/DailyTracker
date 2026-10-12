@@ -193,7 +193,7 @@ export default function JiraView() {
                       <div
                         key={issue.key}
                         className="issue-row"
-                        onClick={() => window.tracker.openUrl(issue.url)}
+                        onClick={() => { window.tracker.markJiraSeen(issue.key); window.tracker.openUrl(issue.url) }}
                       >
                         <span className="jira-key">{issue.key}</span>
                         <span className="issue-title">{issue.title}</span>
@@ -225,7 +225,7 @@ export default function JiraView() {
                   <span className="jira-key">{issue.key}</span>
                   <button
                     className="issue-title issue-title-link"
-                    onClick={() => window.tracker.openUrl(issue.url)}
+                    onClick={() => { window.tracker.markJiraSeen(issue.key); window.tracker.openUrl(issue.url) }}
                   >
                     {issue.title}
                   </button>

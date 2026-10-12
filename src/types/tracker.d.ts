@@ -44,6 +44,28 @@ export interface PR {
   jiraUrl:        string | null
 }
 
+export interface NeedsYouPR {
+  url:       string
+  title:     string
+  repo:      string
+  number:    number
+  reasons:       string[]
+  searchReasons: string[]   // reasons that remain after the notification is read
+  unread:        boolean
+  threadId:      string | null
+  updatedAt: string | null
+}
+
+export interface NeedsYouJira {
+  key:          string
+  title:        string
+  status:       string
+  url:          string
+  newCount:     number
+  latestAt:     string
+  latestAuthor: string
+}
+
 export interface SentryPreset {
   name:  string
   flags: string
@@ -96,7 +118,7 @@ export interface IssueDetail {
 }
 
 export type AlertMode = 'alarm' | 'flash' | 'none'
-export type TabId    = 'today' | 'calendar' | 'jira' | 'github' | 'sentry' | 'notes' | 'settings'
+export type TabId    = 'today' | 'tasks' | 'calendar' | 'jira' | 'github' | 'sentry' | 'notes' | 'settings'
 export type ThemeId  = 'default' | 'ocean' | 'terminal' | 'coastal'
 
 export interface ReviewIssue {
@@ -121,6 +143,10 @@ declare global {
       fetchJiraSprint:           ()                                              => Promise<{ issues?: JiraIssue[]; error?: string }>
       fetchJiraFilterIssues:     (filterId: string, nextPageToken: string | null) => Promise<{ issues?: JiraIssue[]; nextPageToken?: string | null; error?: string }>
       fetchGithub:          ()                             => Promise<{ myPRs?: PR[]; reviews?: PR[]; openPRs?: PR[]; error?: string | null }>
+      fetchNeedsYou:        ()                             => Promise<{ prs: NeedsYouPR[]; error: string | null }>
+      markGithubRead:       (threadId: string)             => Promise<{ error: string | null }>
+      fetchJiraNeedsYou:    ()                             => Promise<{ issues: NeedsYouJira[]; error: string | null }>
+      markJiraSeen:         (key: string)                  => Promise<boolean>
       fetchSentry:          (flags?: string)                => Promise<{ projects?: SentryProjectResult[]; error?: string | null }>
       fetchSentryIssue:     (tag: string)                  => Promise<{ detail?: IssueDetail; error?: string }>
       openSentryIssue:      (tag: string)                  => Promise<void>
