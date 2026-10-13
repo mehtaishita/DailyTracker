@@ -849,71 +849,39 @@ ipcMain.handle('fetch-github', async () => {
 })
 
 // ── Today: "Needs you" ────────────────────────────────────────────────────────
-// PRs needing attention: unread GitHub notifications (GitHub tracks read state,
-// cleared when you view the PR), open review requests, and your approved PRs.
+// Unread GitHub notifications for comments on PRs you authored or have commented
+// on, and for mentions. GitHub tracks read state; opening or ticking a row marks
+// the thread read.
 
 const NOTIFICATION_REASONS = {
-  mention:          'Mentioned',
-  team_mention:     'Team mentioned',
-  comment:          'New comments',
-  author:           'Activity on your PR',
-  review_requested: 'Review requested',
-  assign:           'Assigned',
-  state_change:     'State changed',
+  author:       'Activity on your PR',
+  comment:      'New comments',
+  mention:      'Mentioned',
+  team_mention: 'Team mentioned',
 }
 
 ipcMain.handle('fetch-needs-you', async () => {
-  const [notifRes, reviewReqRes, approvedRes] = await Promise.all([
-    ghCommand('notifications'),
-    ghCommand('review-requested'),
-    ghCommand('my-approved'),
-  ])
+  const notifRes = await ghCommand('notifications')
+  if (notifRes.error) return { prs: [], error: notifRes.error }
 
-  if (notifRes.error && reviewReqRes.error && approvedRes.error)
-    return { prs: [], error: notifRes.error }
-
-  // searchReasons are the ones that stay after the notification is marked read
   const byUrl = new Map()
-  function add(url, fields, reason, fromSearch) {
-    const item = byUrl.get(url) || { url, reasons: [], searchReasons: [], unread: false, threadId: null, updatedAt: null, ...fields }
-    if (!item.reasons.includes(reason)) item.reasons.push(reason)
-    if (fromSearch && !item.searchReasons.includes(reason)) item.searchReasons.push(reason)
-    byUrl.set(url, item)
-    return item
-  }
-
   for (const n of (notifRes.data || [])) {
     if (n.subject?.type !== 'PullRequest') continue
+    const reason = NOTIFICATION_REASONS[n.reason]
+    if (!reason) continue
     const m = n.subject.url?.match(/repos\/([^/]+\/[^/]+)\/pulls\/(\d+)$/)
     if (!m) continue
-    const item = add(
-      `https://github.com/${m[1]}/pull/${m[2]}`,
-      { title: n.subject.title, repo: m[1], number: Number(m[2]) },
-      NOTIFICATION_REASONS[n.reason] || 'New activity',
-      false,
-    )
-    item.unread    = true
-    item.threadId  = n.id
-    item.updatedAt = n.updated_at
+    const url  = `https://github.com/${m[1]}/pull/${m[2]}`
+    const item = byUrl.get(url) || {
+      url, title: n.subject.title, repo: m[1], number: Number(m[2]),
+      reasons: [], threadId: n.id, updatedAt: n.updated_at,
+    }
+    if (!item.reasons.includes(reason)) item.reasons.push(reason)
+    if ((n.updated_at || '') > (item.updatedAt || '')) { item.updatedAt = n.updated_at; item.threadId = n.id }
+    byUrl.set(url, item)
   }
 
-  for (const pr of (reviewReqRes.data || [])) {
-    if (pr.isDraft) continue
-    add(pr.url, { title: pr.title, repo: pr.repository?.nameWithOwner || '', number: pr.number }, 'Review requested', true)
-  }
-
-  for (const pr of (approvedRes.data || [])) {
-    add(pr.url, { title: pr.title, repo: pr.repository?.nameWithOwner || '', number: pr.number }, 'Approved — ready to merge', true)
-  }
-
-  // Unread activity first (newest first), then review requests, then approved
-  const prs = [...byUrl.values()].sort((a, b) => {
-    if (a.unread !== b.unread) return a.unread ? -1 : 1
-    if (a.unread) return (b.updatedAt || '').localeCompare(a.updatedAt || '')
-    return a.reasons.includes('Review requested') === b.reasons.includes('Review requested')
-      ? 0 : a.reasons.includes('Review requested') ? -1 : 1
-  })
-
+  const prs = [...byUrl.values()].sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
   return { prs, error: null }
 })
 

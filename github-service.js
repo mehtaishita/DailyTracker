@@ -14,9 +14,6 @@ const COMMANDS = {
   'review-requested': [
     'search', 'prs', '--review-requested=@me', '--state=open', '--json', FIELDS, '--limit', '200',
   ],
-  'my-approved': [
-    'search', 'prs', '--author=@me', '--state=open', '--review=approved', '--json', FIELDS, '--limit', '50',
-  ],
   // Unread notification threads only (GitHub tracks read state)
   'notifications': [
     'api', 'notifications?per_page=50',

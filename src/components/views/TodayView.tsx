@@ -110,17 +110,16 @@ function NeedsYou() {
 
   useEffect(() => { load() }, [])
 
-  // Drop the notification's tags; keep the row if it's still awaiting review or merge
+  // Marks the thread read on GitHub and drops the row
   async function markPrRead(pr: NeedsYouPR) {
-    if (!pr.threadId) return
+    setGithub(prev => ({ ...prev, items: prev.items.filter(p => p.url !== pr.url) }))
     const res = await window.tracker.markGithubRead(pr.threadId)
-    if (res.error) { console.error('[TodayView] markGithubRead failed:', res.error); return }
-    setGithub(prev => ({
-      ...prev,
-      items: prev.items.flatMap(p => p.url !== pr.url ? [p]
-        : p.searchReasons.length === 0 ? []
-        : [{ ...p, reasons: p.searchReasons, unread: false, threadId: null, updatedAt: null }]),
-    }))
+    if (res.error) console.error('[TodayView] markGithubRead failed:', res.error)
+  }
+
+  function openPr(pr: NeedsYouPR) {
+    markPrRead(pr)
+    window.tracker.openUrl(pr.url)
   }
 
   function markJiraSeen(issue: NeedsYouJira) {
@@ -148,13 +147,13 @@ function NeedsYou() {
       ) : github.items.length === 0 ? (
         <div className="cal-none">You're all caught up</div>
       ) : github.items.map(pr => (
-        <div key={pr.url} className="needs-you-row" onClick={() => window.tracker.openUrl(pr.url)}>
-          <span className={`needs-you-dot${pr.unread ? ' unread' : ''}`} />
+        <div key={pr.url} className="needs-you-row" onClick={() => openPr(pr)}>
+          <span className="needs-you-dot unread" />
           <span className="review-pr-link">{pr.repo.split('/').pop()}#{pr.number}</span>
           <span className="needs-you-title">{pr.title}</span>
           {pr.reasons.map(r => <span key={r} className="pr-draft">{r}</span>)}
           {pr.updatedAt && <span className="needs-you-time">{formatAgo(pr.updatedAt)}</span>}
-          {pr.threadId && <MarkReadButton onClick={() => markPrRead(pr)} />}
+          <MarkReadButton onClick={() => markPrRead(pr)} />
         </div>
       ))}
 

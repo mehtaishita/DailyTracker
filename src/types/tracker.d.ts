@@ -49,10 +49,8 @@ export interface NeedsYouPR {
   title:     string
   repo:      string
   number:    number
-  reasons:       string[]
-  searchReasons: string[]   // reasons that remain after the notification is read
-  unread:        boolean
-  threadId:      string | null
+  reasons:   string[]
+  threadId:  string
   updatedAt: string | null
 }
 

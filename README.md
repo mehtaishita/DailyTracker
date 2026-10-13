@@ -8,7 +8,7 @@ A personal Electron desktop app for staying on top of daily work — meetings, J
   - **Daily quote** — libquotes.com's Quote of the Day, fetched once a day.
   - **Next up** — the next meeting with a live countdown and a Join button.
   - **Stand** — on Monday, Tuesday and Thursday, what you shipped since the last standup in your watched repos (Settings → GitHub), read from their checkouts under `~/code` via [git-standup](https://github.com/nilbuild/git-standup). Commits are grouped by the Jira ticket in their subject (click a ticket to open it); each refresh fetches first, so PRs merged on GitHub appear too, marked and clickable. Monday covers Thursday onward, Tuesday covers Monday onward, Thursday covers Tuesday onward.
-  - **Needs you** — GitHub PRs with unread activity (mentions, comments, activity on your PRs), PRs awaiting your review, and your approved PRs ready to merge; plus Jira tickets with comments you haven't seen. Each row can be marked as read.
+  - **Needs you** — GitHub PRs with unread comments on PRs you authored or have commented on, and PRs where you were mentioned; plus Jira tickets with comments you haven't seen. Opening a row or clicking ✓ marks it read.
   - **Meetings** — today's schedule, with past meetings dimmed.
 - **Calendar** — Week or month view of meetings from ICS/Outlook calendar URLs, with meeting link detection. Opens on the current week with today's agenda.
 - **Jira** — Shows your current sprint issues and their statuses.
@@ -21,7 +21,7 @@ A personal Electron desktop app for staying on top of daily work — meetings, J
 
 ### How "Needs you" tracks read state
 
-- **GitHub** uses GitHub's own notification read state — opening the PR on GitHub or clicking ✓ marks it read on GitHub. Nothing is stored locally.
+- **GitHub** uses GitHub's own notification read state — opening the PR from the app or clicking ✓ marks the thread read on GitHub. Nothing is stored locally.
 - **Jira** has no public read/unread API, so the app records when you last opened each ticket from the app (or clicked ✓). A ticket shows when someone else has commented since then; commenting yourself also counts as seen.
 
 ## Requirements
