@@ -1286,13 +1286,17 @@ function parseICSRange(raw, startStr, endStr) {
     const teamsLine = prop('X-MICROSOFT-ONLINEMEETINGCONFLINK')
     const locLine   = prop('LOCATION')
     const descLine  = prop('DESCRIPTION')
-    const firstUrl  = str => { const m = str.match(/https?:\/\/\S+/); return m ? m[0].replace(/[,;<>"\\]+$/, '') : null }
-    const isVideo   = str => /meet\.google\.com|zoom\.us|teams\.microsoft\.com|webex\.com|gotomeeting\.com/i.test(str)
+    // Stops at "\" too, since ICS text escapes newlines/commas as "\n" / "\,"
+    const urlsIn    = str => (str.match(/https?:\/\/[^\s<>"\\]+/g) || []).map(u => u.replace(/[,;.)]+$/, ''))
+    const firstUrl  = str => urlsIn(str)[0] || null
+    const isVideo   = url => /meet\.google\.com|zoom\.us|teams\.microsoft\.com|teams\.live\.com|webex\.com|gotomeeting\.com/i.test(url)
+    // Location/description often hold other links (Jira, docs) — take the first video one
+    const videoUrl  = str => urlsIn(str).find(isVideo) || null
     const meetUrl   = firstUrl(confLine)
       || firstUrl(zoomLine)
       || firstUrl(teamsLine)
-      || (isVideo(locLine)  ? firstUrl(locLine)  : null)
-      || (isVideo(descLine) ? firstUrl(descLine) : null)
+      || videoUrl(locLine)
+      || videoUrl(descLine)
       || null
 
     const ev = { uid, summary, dtstart, dtend, rruleProp, exdates, meetUrl }
