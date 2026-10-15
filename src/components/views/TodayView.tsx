@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import CollapsibleSection from '../CollapsibleSection'
 import DailyQuote from '../DailyQuote'
 import Stand from '../Stand'
@@ -103,17 +103,27 @@ function NeedsYou() {
   const [github, setGithub] = useState<Stream<NeedsYouPR>>(emptyStream)
   const [jira,   setJira]   = useState<Stream<NeedsYouJira>>(emptyStream)
 
+  // PR url → updatedAt when dismissed, so a fetch already in flight can't bring it back
+  const dismissedPrs = useRef(new Map<string, string>())
+
   function load() {
-    loadStream(() => window.tracker.fetchNeedsYou().then(r => ({ items: r.prs || [], error: r.error })), setGithub, 'fetchNeedsYou')
+    loadStream(() => window.tracker.fetchNeedsYou().then(r => ({
+      items: (r.prs || []).filter(p => {
+        const readAt = dismissedPrs.current.get(p.url)
+        return readAt === undefined || (p.updatedAt || '') > readAt
+      }),
+      error: r.error,
+    })), setGithub, 'fetchNeedsYou')
     loadStream(() => window.tracker.fetchJiraNeedsYou().then(r => ({ items: r.issues || [], error: r.error })), setJira, 'fetchJiraNeedsYou')
   }
 
   useEffect(() => { load() }, [])
 
-  // Marks the thread read on GitHub and drops the row
+  // Marks the PR's threads read on GitHub and drops the row
   async function markPrRead(pr: NeedsYouPR) {
+    dismissedPrs.current.set(pr.url, pr.updatedAt || '')
     setGithub(prev => ({ ...prev, items: prev.items.filter(p => p.url !== pr.url) }))
-    const res = await window.tracker.markGithubRead(pr.threadId)
+    const res = await window.tracker.markGithubRead(pr)
     if (res.error) console.error('[TodayView] markGithubRead failed:', res.error)
   }
 

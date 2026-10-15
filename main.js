@@ -110,6 +110,10 @@ function initDb() {
       issue_key TEXT PRIMARY KEY,
       seen_at   INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS github_read (
+      pr_url  TEXT PRIMARY KEY,
+      read_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS sentry_skill_runs (
       issue_tag  TEXT NOT NULL,
       skill_name TEXT NOT NULL,
@@ -851,7 +855,8 @@ ipcMain.handle('fetch-github', async () => {
 // ── Today: "Needs you" ────────────────────────────────────────────────────────
 // Unread GitHub notifications for comments on PRs you authored or have commented
 // on, and for mentions. GitHub tracks read state; opening or ticking a row marks
-// the thread read.
+// the PR's threads read. GitHub's list can lag behind a mark, so dismissals are
+// also kept locally (github_read) until newer activity arrives on the PR.
 
 const NOTIFICATION_REASONS = {
   author:       'Activity on your PR',
@@ -874,20 +879,33 @@ ipcMain.handle('fetch-needs-you', async () => {
     const url  = `https://github.com/${m[1]}/pull/${m[2]}`
     const item = byUrl.get(url) || {
       url, title: n.subject.title, repo: m[1], number: Number(m[2]),
-      reasons: [], threadId: n.id, updatedAt: n.updated_at,
+      reasons: [], threadIds: [], updatedAt: n.updated_at,
     }
     if (!item.reasons.includes(reason)) item.reasons.push(reason)
-    if ((n.updated_at || '') > (item.updatedAt || '')) { item.updatedAt = n.updated_at; item.threadId = n.id }
+    if (!item.threadIds.includes(n.id)) item.threadIds.push(n.id)
+    if ((n.updated_at || '') > (item.updatedAt || '')) item.updatedAt = n.updated_at
     byUrl.set(url, item)
   }
 
-  const prs = [...byUrl.values()].sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+  const readRows = db.prepare('SELECT pr_url, read_at FROM github_read').all()
+  const readMap  = Object.fromEntries(readRows.map(r => [r.pr_url, r.read_at]))
+  const prs = [...byUrl.values()]
+    .filter(pr => !readMap[pr.url] || (pr.updatedAt || '') > readMap[pr.url])
+    .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))
   return { prs, error: null }
 })
 
-ipcMain.handle('mark-github-read', async (_e, threadId) => {
-  const res = await ghCommand('mark-thread-read', { threadId })
-  return { error: res.error || null }
+ipcMain.handle('mark-github-read', async (_e, pr) => {
+  const url       = String(pr?.url || '')
+  const threadIds = Array.isArray(pr?.threadIds) ? pr.threadIds.map(String) : []
+  if (!/^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/.test(url)) return { error: 'invalid url' }
+  try {
+    const readAt = typeof pr.updatedAt === 'string' && pr.updatedAt ? pr.updatedAt : new Date().toISOString()
+    db.prepare('INSERT OR REPLACE INTO github_read (pr_url, read_at) VALUES (?, ?)').run(url, readAt)
+  } catch (e) { console.error('[db] mark-github-read:', e) }
+  const results = await Promise.all(threadIds.map(threadId => ghCommand('mark-thread-read', { threadId })))
+  const failed  = results.find(r => r.error)
+  return { error: failed ? failed.error : null }
 })
 
 // ── Claude Review IPC ─────────────────────────────────────────────────────────

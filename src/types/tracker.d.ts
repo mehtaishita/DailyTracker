@@ -50,7 +50,7 @@ export interface NeedsYouPR {
   repo:      string
   number:    number
   reasons:   string[]
-  threadId:  string
+  threadIds: string[]
   updatedAt: string | null
 }
 
@@ -170,7 +170,7 @@ declare global {
       fetchJiraFilterIssues:     (filterId: string, nextPageToken: string | null) => Promise<{ issues?: JiraIssue[]; nextPageToken?: string | null; error?: string }>
       fetchGithub:          ()                             => Promise<{ myPRs?: PR[]; reviews?: PR[]; openPRs?: PR[]; error?: string | null }>
       fetchNeedsYou:        ()                             => Promise<{ prs: NeedsYouPR[]; error: string | null }>
-      markGithubRead:       (threadId: string)             => Promise<{ error: string | null }>
+      markGithubRead:       (pr: NeedsYouPR)               => Promise<{ error: string | null }>
       fetchJiraNeedsYou:    ()                             => Promise<{ issues: NeedsYouJira[]; error: string | null }>
       markJiraSeen:         (key: string)                  => Promise<boolean>
       fetchSentry:          (flags?: string)                => Promise<{ projects?: SentryProjectResult[]; error?: string | null }>

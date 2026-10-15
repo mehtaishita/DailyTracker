@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('tracker', {
   fetchJiraFilterIssues: (filterId, nextPageToken)    => ipcRenderer.invoke('fetch-jira-filter-issues', filterId, nextPageToken),
   fetchGithub:     ()                    => ipcRenderer.invoke('fetch-github'),
   fetchNeedsYou:   ()                    => ipcRenderer.invoke('fetch-needs-you'),
-  markGithubRead:  (threadId)            => ipcRenderer.invoke('mark-github-read', threadId),
+  markGithubRead:  (pr)                  => ipcRenderer.invoke('mark-github-read', pr),
   fetchJiraNeedsYou: ()                  => ipcRenderer.invoke('fetch-jira-needs-you'),
   markJiraSeen:    (key)                 => ipcRenderer.invoke('mark-jira-seen', key),
   fetchSentry:     (flags)               => ipcRenderer.invoke('fetch-sentry', flags),
