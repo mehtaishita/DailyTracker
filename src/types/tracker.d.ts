@@ -169,6 +169,8 @@ declare global {
       getDaybookDir:        ()                             => Promise<string>
       chooseDaybookDir:     ()                             => Promise<string | null>
       revealDaybookDir:     ()                             => Promise<void>
+      takePendingTab:       ()                             => Promise<TabId | null>
+      onOpenTab:            (cb: (tab: TabId) => void)     => void
       fetchJiraSprint:           ()                                              => Promise<{ issues?: JiraIssue[]; error?: string }>
       fetchJiraFilterIssues:     (filterId: string, nextPageToken: string | null) => Promise<{ issues?: JiraIssue[]; nextPageToken?: string | null; error?: string }>
       fetchGithub:          ()                             => Promise<{ myPRs?: PR[]; reviews?: PR[]; openPRs?: PR[]; error?: string | null }>

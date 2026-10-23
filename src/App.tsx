@@ -54,6 +54,12 @@ export default function App() {
     boot()
   }, [])
 
+  // Clicking the daybook reminder opens a tab, either here or in a newly created window
+  useEffect(() => {
+    window.tracker.takePendingTab().then(tab => { if (tab) setCurrentTab(tab) })
+    window.tracker.onOpenTab(setCurrentTab)
+  }, [])
+
   // Daybook files can be edited outside the app, so reread them whenever Notes opens
   useEffect(() => {
     if (currentTab === 'notes') window.tracker.readNotes().then(setNotesData)

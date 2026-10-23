@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, powerMonitor, nativeImage, safeStorage } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, dialog, Notification, powerMonitor, nativeImage, safeStorage } = require('electron')
 const path     = require('path')
 const fs       = require('fs')
 const http     = require('http')
@@ -427,6 +427,53 @@ ipcMain.handle('write-note', (_e, dateStr, text) => {
 })
 
 ipcMain.handle('get-daybook-dir', () => getDaybookDir())
+
+// ── Daybook reminder ─────────────────────────────────────────────────────────
+// Weekdays at 4:45pm, unless today's entry already exists. Checked every 30s rather
+// than with one long timeout so a reminder missed during sleep still fires on wake.
+const REMINDER_MINUTES = 16 * 60 + 45
+let reminderNotification   // held so the click handler isn't garbage-collected
+let pendingTab = null      // tab to open once a freshly created window's renderer asks
+
+function checkDaybookReminder() {
+  const now   = new Date()
+  const today = now.toLocaleDateString('en-CA')
+  const day   = now.getDay()
+  if (day === 0 || day === 6) return
+  if (now.getHours() * 60 + now.getMinutes() < REMINDER_MINUTES) return
+  try {
+    const last = db.prepare("SELECT value FROM settings WHERE key = 'daybook_reminder_last'").get()?.value
+    if (last === today) return
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('daybook_reminder_last', ?)").run(today)
+    if (fs.existsSync(path.join(getDaybookDir(), `${today}.md`))) return
+  } catch (e) { console.error('[daybook] reminder:', e); return }
+  if (!Notification.isSupported()) return
+
+  reminderNotification = new Notification({
+    title: 'Daybook',
+    body:  "Time to write today's daybook entry.",
+  })
+  reminderNotification.on('click', () => openTab('notes'))
+  reminderNotification.show()
+}
+
+function openTab(tab) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    pendingTab = tab
+    createWindow()
+  } else {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.webContents.send('open-tab', tab)
+  }
+  app.focus({ steal: true })
+}
+
+ipcMain.handle('take-pending-tab', () => {
+  const tab = pendingTab
+  pendingTab = null
+  return tab
+})
 
 // Switching folders copies over any notes the new folder doesn't already have;
 // the old folder is left untouched.
@@ -1513,6 +1560,8 @@ app.whenReady().then(() => {
 
   createWindow()
   scheduleDailyRefresh()
+  checkDaybookReminder()
+  setInterval(checkDaybookReminder, 30_000)
   powerMonitor.on('resume', () => {
     const today = new Date().toLocaleDateString('en-CA')
     if (today !== lastLoadDate && mainWindow) {

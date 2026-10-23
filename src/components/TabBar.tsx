@@ -15,7 +15,7 @@ const TABS: Tab[] = [
   { id: 'jira',     label: 'Jira',     Icon: Ticket      },
   { id: 'github',   label: 'GitHub',   Icon: Github        },
   { id: 'sentry',   label: 'Sentry',   Icon: AlertTriangle },
-  { id: 'notes',    label: 'Notes',    Icon: StickyNote    },
+  { id: 'notes',    label: 'Daybook',  Icon: StickyNote    },
   { id: 'tasks',    label: 'Tasks',    Icon: CheckCircle },
   { id: 'settings', label: 'Settings', Icon: Settings    },
 ]

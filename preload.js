@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('tracker', {
   getDaybookDir:    ()                   => ipcRenderer.invoke('get-daybook-dir'),
   chooseDaybookDir: ()                   => ipcRenderer.invoke('choose-daybook-dir'),
   revealDaybookDir: ()                   => ipcRenderer.invoke('reveal-daybook-dir'),
+  takePendingTab:   ()                   => ipcRenderer.invoke('take-pending-tab'),
+  onOpenTab:        (cb)                 => ipcRenderer.on('open-tab', (_e, tab) => cb(tab)),
   fetchJiraSprint:       ()                           => ipcRenderer.invoke('fetch-jira-sprint'),
   fetchJiraFilterIssues: (filterId, nextPageToken)    => ipcRenderer.invoke('fetch-jira-filter-issues', filterId, nextPageToken),
   fetchGithub:     ()                    => ipcRenderer.invoke('fetch-github'),

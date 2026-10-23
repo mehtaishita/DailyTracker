@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { loadDaybookTemplate, stripTemplate } from '../../daybook'
+import { loadDaybookTemplate, stripTemplate, WORKDAY_GIFS, WEEKEND_GIFS, pickRandom, isWeekend, giphyUrl } from '../../daybook'
 
 const TODAY_STR = new Date().toLocaleDateString('en-CA')
 
@@ -26,6 +26,9 @@ export default function NotesView({ notesData, onUpdateNote }: Props) {
   const [textValue,  setTextValue]  = useState('')
   const [query,      setQuery]      = useState('')
   const [template,   setTemplate]   = useState<string | null>(null)
+  const [gif]                       = useState(() => pickRandom(WORKDAY_GIFS))
+  const [weekendGif]                = useState(() => pickRandom(WEEKEND_GIFS))
+  const [gifFailed,  setGifFailed]  = useState(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { loadDaybookTemplate().then(setTemplate) }, [])
@@ -71,7 +74,7 @@ export default function NotesView({ notesData, onUpdateNote }: Props) {
         <input
           className="notes-search-input"
           type="text"
-          placeholder="Search notes…"
+          placeholder="Search daybook…"
           value={query}
           onChange={e => setQuery(e.target.value)}
           autoComplete="off"
@@ -89,20 +92,32 @@ export default function NotesView({ notesData, onUpdateNote }: Props) {
             <span className="notes-tab-date">{dateLabel(notesDate)}</span>
             <button className="cal-arrow" onClick={() => navDate(1)}>›</button>
           </div>
-          <textarea
-            className="notes-textarea"
-            placeholder="Write your notes…"
-            value={textValue}
-            onChange={onInput}
-            spellCheck={true}
-          />
+          {isWeekend(notesDate) ? (
+            <div className="daybook-weekend">
+              <div className="daybook-weekend-caption">Enjoy your weekend slut</div>
+              <img src={giphyUrl(weekendGif.id, 'full')} alt={weekendGif.label} />
+            </div>
+          ) : <>
+            <textarea
+              className="notes-textarea"
+              placeholder="Write today's entry…"
+              value={textValue}
+              onChange={onInput}
+              spellCheck={true}
+            />
+            {!gifFailed && (
+              <div className="daybook-gif">
+                <img src={giphyUrl(gif.id)} alt={gif.label} title={gif.label} onError={() => setGifFailed(true)} />
+              </div>
+            )}
+          </>}
         </div>
       )}
 
       {showSearch && (
         <div className="notes-search-results" style={{ display: 'block' }}>
           {matches.length === 0 ? (
-            <div className="notes-search-empty">No notes match your search</div>
+            <div className="notes-search-empty">No entries match your search</div>
           ) : matches.map(([dStr, text]) => (
             <div
               key={dStr}
