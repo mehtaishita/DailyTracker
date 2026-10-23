@@ -166,6 +166,9 @@ declare global {
       fetchStandup:         (since: string)                => Promise<{ standup?: Standup; error?: string }>
       readNotes:            ()                             => Promise<Record<string, string>>
       writeNote:            (date: string, text: string)  => Promise<boolean>
+      getDaybookDir:        ()                             => Promise<string>
+      chooseDaybookDir:     ()                             => Promise<string | null>
+      revealDaybookDir:     ()                             => Promise<void>
       fetchJiraSprint:           ()                                              => Promise<{ issues?: JiraIssue[]; error?: string }>
       fetchJiraFilterIssues:     (filterId: string, nextPageToken: string | null) => Promise<{ issues?: JiraIssue[]; nextPageToken?: string | null; error?: string }>
       fetchGithub:          ()                             => Promise<{ myPRs?: PR[]; reviews?: PR[]; openPRs?: PR[]; error?: string | null }>

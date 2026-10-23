@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, powerMonitor, nativeImage, safeStorage } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, dialog, powerMonitor, nativeImage, safeStorage } = require('electron')
 const path     = require('path')
 const fs       = require('fs')
 const http     = require('http')
@@ -18,6 +18,8 @@ const TODOS_FILE = path.join(STATE_DIR, 'todos.json')   // Slack sync inbox (rea
 const NOTES_FILE = path.join(STATE_DIR, 'notes.json')   // legacy — migrated on first run
 const ENV_FILE   = path.join(__dirname, '.env')
 const DB_FILE    = path.join(STATE_DIR, 'tracker.db')
+const DEFAULT_DAYBOOK_DIR = path.join(os.homedir(), 'Documents', 'Daybook')
+const NOTE_FILE_RE = /^(\d{4}-\d{2}-\d{2})\.md$/
 
 // Apps launched from the Dock get a minimal PATH (/usr/bin:/bin:…), so gh, sentry
 // and claude wouldn't resolve. Borrow the login shell's PATH plus the usual install dirs.
@@ -130,6 +132,7 @@ function initDb() {
   }
 
   migrateFromJson()
+  migrateNotesToDaybook()
   archivePastDoneSync()
 }
 
@@ -183,6 +186,54 @@ function migrateFromJson() {
       }
     }
   } catch (e) { console.error('[db] notes migration error:', e) }
+}
+
+// ── Daybook ────────────────────────────────────────────────────────────────────
+// Each day's note is a <date>.md file in a user-chosen folder.
+function getDaybookDir() {
+  try {
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'daybook_dir'").get()
+    if (row?.value) return row.value
+  } catch (_) {}
+  return DEFAULT_DAYBOOK_DIR
+}
+
+function readDaybook(dir) {
+  const notes = {}
+  try {
+    if (!fs.existsSync(dir)) return notes
+    for (const f of fs.readdirSync(dir)) {
+      const m = f.match(NOTE_FILE_RE)
+      if (m) notes[m[1]] = fs.readFileSync(path.join(dir, f), 'utf8')
+    }
+  } catch (e) { console.error('[daybook] read:', e) }
+  return notes
+}
+
+// Write to a temp file and rename so a crash never leaves a half-written note.
+function writeFileAtomic(file, text) {
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const tmp = `${file}.${process.pid}.tmp`
+  fs.writeFileSync(tmp, text)
+  fs.renameSync(tmp, file)
+}
+
+// One-time export of the old notes table to daybook files. The table is kept as a backup.
+function migrateNotesToDaybook() {
+  try {
+    if (db.prepare("SELECT 1 FROM settings WHERE key = 'daybook_migrated'").get()) return
+    const dir  = getDaybookDir()
+    const rows = db.prepare('SELECT date, text FROM notes').all()
+    let written = 0
+    for (const { date, text } of rows) {
+      const file = path.join(dir, `${date}.md`)
+      if (!text?.trim() || fs.existsSync(file)) continue
+      writeFileAtomic(file, text)
+      written++
+    }
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('daybook_migrated', '1')").run()
+    console.log(`[daybook] migrated ${written} note(s) to ${dir}`)
+  } catch (e) { console.error('[daybook] migration error:', e) }
 }
 
 // Merge todos from todos.json into the DB.
@@ -359,24 +410,50 @@ ipcMain.handle('archive-past-done', (_e, todayStr) => {
   } catch (e) { console.error('[db] archive-past-done:', e); return false }
 })
 
-ipcMain.handle('read-notes', () => {
-  try {
-    const rows = db.prepare('SELECT date, text FROM notes').all()
-    return Object.fromEntries(rows.map(r => [r.date, r.text]))
-  } catch (e) { console.error('[db] read-notes:', e); return {} }
-})
+ipcMain.handle('read-notes', () => readDaybook(getDaybookDir()))
 
 ipcMain.handle('write-note', (_e, dateStr, text) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false
   const clean = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+  const file  = path.join(getDaybookDir(), `${dateStr}.md`)
   try {
     if (clean.trim()) {
-      db.prepare('INSERT OR REPLACE INTO notes (date, text) VALUES (?, ?)').run(dateStr, clean)
-    } else {
-      db.prepare('DELETE FROM notes WHERE date = ?').run(dateStr)
+      writeFileAtomic(file, clean)
+    } else if (fs.existsSync(file)) {
+      fs.unlinkSync(file)
     }
     return true
-  } catch (e) { console.error('[db] write-note:', e); return false }
+  } catch (e) { console.error('[daybook] write-note:', e); return false }
+})
+
+ipcMain.handle('get-daybook-dir', () => getDaybookDir())
+
+// Switching folders copies over any notes the new folder doesn't already have;
+// the old folder is left untouched.
+ipcMain.handle('choose-daybook-dir', async () => {
+  const current = getDaybookDir()
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title:       'Choose daybook folder',
+    defaultPath: current,
+    properties:  ['openDirectory', 'createDirectory'],
+  })
+  if (res.canceled || !res.filePaths[0]) return null
+  const next = res.filePaths[0]
+  if (next === current) return current
+  try {
+    for (const [date, text] of Object.entries(readDaybook(current))) {
+      const to = path.join(next, `${date}.md`)
+      if (!fs.existsSync(to)) writeFileAtomic(to, text)
+    }
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('daybook_dir', next)
+    return next
+  } catch (e) { console.error('[daybook] choose-daybook-dir:', e); return null }
+})
+
+ipcMain.handle('reveal-daybook-dir', () => {
+  const dir = getDaybookDir()
+  fs.mkdirSync(dir, { recursive: true })
+  shell.openPath(dir)
 })
 
 ipcMain.handle('read-history', () => {

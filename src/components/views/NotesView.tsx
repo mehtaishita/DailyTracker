@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { loadDaybookTemplate, stripTemplate } from '../../daybook'
 
 const TODAY_STR = new Date().toLocaleDateString('en-CA')
 
@@ -24,20 +25,26 @@ export default function NotesView({ notesData, onUpdateNote }: Props) {
   const [notesDate,  setNotesDate]  = useState(TODAY_STR)
   const [textValue,  setTextValue]  = useState('')
   const [query,      setQuery]      = useState('')
+  const [template,   setTemplate]   = useState<string | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Sync textarea to notesDate
+  useEffect(() => { loadDaybookTemplate().then(setTemplate) }, [])
+
+  // Sync textarea to notesDate; days without a note start from the template
   useEffect(() => {
-    setTextValue(notesData[notesDate] || '')
-  }, [notesDate, notesData])
+    if (template === null) return
+    setTextValue(notesData[notesDate] || template)
+  }, [notesDate, notesData, template])
 
   function onInput(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const cleaned = e.target.value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     setTextValue(cleaned)
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    // An untouched template isn't a note, so it saves as empty (no file)
+    const toSave = cleaned === template ? '' : cleaned
     saveTimerRef.current = setTimeout(async () => {
-      onUpdateNote(notesDate, cleaned)
-      await window.tracker.writeNote(notesDate, cleaned)
+      onUpdateNote(notesDate, toSave)
+      await window.tracker.writeNote(notesDate, toSave)
     }, 700)
   }
 
@@ -49,6 +56,7 @@ export default function NotesView({ notesData, onUpdateNote }: Props) {
 
   const matches = query
     ? Object.entries(notesData)
+        .map(([d, t]) => [d, stripTemplate(t, template || '')] as [string, string])
         .filter(([, t]) => t.toLowerCase().includes(query.toLowerCase()))
         .sort(([a], [b]) => b.localeCompare(a))
     : []

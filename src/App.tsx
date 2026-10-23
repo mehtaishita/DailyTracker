@@ -54,6 +54,11 @@ export default function App() {
     boot()
   }, [])
 
+  // Daybook files can be edited outside the app, so reread them whenever Notes opens
+  useEffect(() => {
+    if (currentTab === 'notes') window.tracker.readNotes().then(setNotesData)
+  }, [currentTab])
+
   // File-change watcher: reload todos when the file changes externally
   useEffect(() => {
     window.tracker.onFileChanged(async () => {

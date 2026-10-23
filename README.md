@@ -80,6 +80,8 @@ npm run dist && rm -rf "/Applications/Daily Tracker.app" && ditto release/mac-ar
 
 Stored in `~/Library/Application Support/daily-tracker/` (`tracker.db`, `history.json`), shared by the installed app and `npm run dev`. The project's `data/` folder is the old location, kept as a backup.
 
+Notes are a daybook: one Markdown file per day (`2026-10-23.md`) in `~/Documents/Daybook` by default. The folder and the template for new notes are set in Settings → Daybook. The old `notes` table in `tracker.db` is kept as a backup.
+
 ## Troubleshooting
 
 - **`NODE_MODULE_VERSION` error for better-sqlite3**: run `npm install` (its postinstall rebuilds the module for Electron).

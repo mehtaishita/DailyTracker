@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import type { AlertMode, ThemeId, SentryPreset, SentrySkill, JiraFilter } from '../../types/tracker'
+import { DEFAULT_DAYBOOK_TEMPLATE, loadDaybookTemplate } from '../../daybook'
 
 interface IcsCalendar {
   url:      string
@@ -20,7 +21,7 @@ const THEMES: { id: ThemeId; label: string; swatches: string[] }[] = [
   { id: 'pan-glass',  label: 'Pan · Glass',  swatches: ['#3d5f63', '#FF218C', '#FFD800', '#21B1FF'] },
 ]
 
-type SettingsTab = 'github' | 'jira' | 'sentry' | 'appearance' | 'calendars'
+type SettingsTab = 'github' | 'jira' | 'sentry' | 'appearance' | 'calendars' | 'daybook'
 
 const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: 'github',     label: 'GitHub' },
@@ -28,6 +29,7 @@ const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: 'sentry',     label: 'Sentry'          },
   { id: 'appearance', label: 'Display' },
   { id: 'calendars',  label: 'Calendars'       },
+  { id: 'daybook',    label: 'Daybook'         },
 ]
 
 export default function SettingsView({ alertMode, onAlertModeChange, theme, onThemeChange }: Props) {
@@ -60,6 +62,9 @@ export default function SettingsView({ alertMode, onAlertModeChange, theme, onTh
   const [editFilterUrl,    setEditFilterUrl]    = useState('')
   const [reviewSkill,      setReviewSkill]      = useState('')
   const [skillSaved,       setSkillSaved]       = useState(false)
+  const [daybookDir,       setDaybookDir]       = useState('')
+  const [daybookTemplate,  setDaybookTemplate]  = useState('')
+  const [templateFlash,    setTemplateFlash]    = useState(false)
 
   useEffect(() => {
     window.tracker.getSetting('ics_calendars').then(async v => {
@@ -121,6 +126,8 @@ export default function SettingsView({ alertMode, onAlertModeChange, theme, onTh
       if (skills.length === 0 && oldSkill) skills = [{ name: oldSkill, command: oldSkill }]
       setSentrySkills(skills)
     })
+    window.tracker.getDaybookDir().then(setDaybookDir)
+    loadDaybookTemplate().then(setDaybookTemplate)
     window.tracker.getSetting('github_repos').then(v => {
       if (!v) return
       try {
@@ -302,6 +309,19 @@ export default function SettingsView({ alertMode, onAlertModeChange, theme, onTh
 
   function cancelEditJiraFilter() {
     setEditingFilterIdx(null)
+  }
+
+  // ── Daybook handlers ─────────────────────────────────────────────────────
+  async function chooseDaybookDir() {
+    const dir = await window.tracker.chooseDaybookDir()
+    if (dir) setDaybookDir(dir)
+  }
+
+  async function saveDaybookTemplate(value: string) {
+    setDaybookTemplate(value)
+    await window.tracker.setSetting('daybook_template', value)
+    setTemplateFlash(true)
+    setTimeout(() => setTemplateFlash(false), 2000)
   }
 
   // ── Jira / Claude handlers ───────────────────────────────────────────────
@@ -775,6 +795,49 @@ export default function SettingsView({ alertMode, onAlertModeChange, theme, onTh
               </div>
             </div>
           )}
+
+          {/* ── Daybook ── */}
+          {activeTab === 'daybook' && <>
+            <div className="settings-section">
+              <div className="settings-section-title">Folder</div>
+              <div className="settings-row">
+                <div className="settings-input-row">
+                  <input className="settings-input" type="text" value={daybookDir} readOnly spellCheck={false} />
+                  <button className="settings-save-btn" onClick={chooseDaybookDir}>Change…</button>
+                  <button className="settings-save-btn" onClick={() => window.tracker.revealDaybookDir()}>Open</button>
+                </div>
+                <div className="settings-hint">
+                  Each day's note is saved here as a Markdown file, like <code>2026-10-23.md</code>. Changing the folder copies your existing notes into the new one.
+                </div>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <div className="settings-section-title">Template</div>
+              <div className="settings-row">
+                <textarea
+                  className="settings-input settings-textarea"
+                  value={daybookTemplate}
+                  onChange={e => setDaybookTemplate(e.target.value)}
+                  spellCheck={true}
+                />
+                <div className="settings-jira-save-row">
+                  <button
+                    className={`settings-save-btn${templateFlash ? ' btn-saved' : ''}`}
+                    onClick={() => saveDaybookTemplate(daybookTemplate)}
+                  >
+                    {templateFlash ? 'Saved' : 'Save'}
+                  </button>
+                  <button className="settings-save-btn" onClick={() => saveDaybookTemplate(DEFAULT_DAYBOOK_TEMPLATE)}>
+                    Reset to default
+                  </button>
+                </div>
+                <div className="settings-hint">
+                  New notes start from this template. Notes you've already written keep their own text.
+                </div>
+              </div>
+            </div>
+          </>}
 
         </div>
       </div>
